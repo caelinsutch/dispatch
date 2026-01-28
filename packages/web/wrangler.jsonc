@@ -1,0 +1,23 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "dispatch-web",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2025-01-28",
+  "compatibility_flags": ["nodejs_compat"],
+  "account_id": "81b0b4d2c4fc164dab0ffb7103e6acb7",
+
+  // Static assets binding (required for Next.js)
+  "assets": {
+    "binding": "ASSETS",
+    "directory": ".open-next/assets"
+  },
+
+  // Environment variables (non-secret)
+  "vars": {
+    "DEPLOYMENT_NAME": "dispatch"
+  }
+
+  // Secrets (set via: wrangler secret put <KEY>)
+  // Required secrets:
+  // - TBD based on Next.js app requirements
+}

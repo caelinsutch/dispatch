@@ -1,0 +1,38 @@
+import type { NextRequest } from "next/server";
+import { NextResponse } from "next/server";
+import { getServerSession } from "@/lib/auth";
+import { controlPlaneFetch } from "@/lib/control-plane";
+
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string; requestId: string }> }
+) {
+  const session = await getServerSession();
+  if (!session?.user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { id, requestId } = await params;
+  const userId = session.user.id || session.user.email || "anonymous";
+
+  try {
+    const body = await request.json();
+    const { answers } = body as { answers: string[][] };
+
+    const response = await controlPlaneFetch(`/sessions/${id}/question/${requestId}/reply`, {
+      method: "POST",
+      body: JSON.stringify({ userId, answers }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return NextResponse.json(data, { status: response.status });
+    }
+
+    return NextResponse.json(data);
+  } catch (error) {
+    console.error("Question reply error:", error);
+    return NextResponse.json({ error: "Failed to submit question answer" }, { status: 500 });
+  }
+}

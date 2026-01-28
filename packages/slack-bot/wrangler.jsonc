@@ -1,0 +1,36 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "dispatch-slack-bot",
+  "main": "dist/index.js",
+  "compatibility_date": "2025-01-28",
+  "compatibility_flags": ["nodejs_compat"],
+  "account_id": "81b0b4d2c4fc164dab0ffb7103e6acb7",
+
+  // KV Namespace for thread-session mapping and user preferences
+  "kv_namespaces": [
+    {
+      "binding": "SLACK_KV",
+      "id": "b9cb3514bf6f4ba1a12f25a28c314140"
+    }
+  ],
+
+  // Service binding to control plane for session management
+  "services": [
+    {
+      "binding": "CONTROL_PLANE",
+      "service": "dispatch-api"
+    }
+  ],
+
+  // Environment variables (non-secret)
+  "vars": {
+    "WEB_APP_URL": "https://dispatch.example.com",
+    "DEFAULT_MODEL": "claude-haiku-4-5"
+  }
+
+  // Secrets (set via: wrangler secret put <KEY>)
+  // Required secrets:
+  // - SLACK_BOT_TOKEN (xoxb-...)
+  // - SLACK_SIGNING_SECRET (from Slack App settings)
+  // - INTERNAL_CALLBACK_SECRET (shared with control-plane for authenticated callbacks)
+}

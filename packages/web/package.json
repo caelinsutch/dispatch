@@ -1,0 +1,43 @@
+{
+  "name": "@dispatch/web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "build:cloudflare": "next build && npx @opennextjs/cloudflare build",
+    "build:next": "next build",
+    "build:opennext": "npx @opennextjs/cloudflare build",
+    "start": "next start",
+    "deploy": "wrangler deploy",
+    "lint": "biome check src/",
+    "lint:fix": "biome check --write src/",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@dispatch/shared": "workspace:*",
+    "@streamdown/code": "^1.0.1",
+    "@tailwindcss/typography": "^0.5.19",
+    "better-auth": "^1.2.0",
+    "next": "^15.1.4",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "streamdown": "^2.1.0",
+    "zustand": "^5.0.3"
+  },
+  "devDependencies": {
+    "@opennextjs/cloudflare": "^1.16.1",
+    "@types/node": "^22.10.5",
+    "@types/react": "^19.0.6",
+    "@types/react-dom": "^19.0.3",
+    "@vitest/coverage-v8": "^4.0.17",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.7.2",
+    "vitest": "^4.0.17",
+    "wrangler": "^3.99.0"
+  }
+}

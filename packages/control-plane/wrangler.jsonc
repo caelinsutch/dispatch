@@ -1,0 +1,58 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "dispatch-api",
+  "main": "dist/index.js",
+  "compatibility_date": "2025-01-28",
+  "compatibility_flags": ["nodejs_compat"],
+  "account_id": "81b0b4d2c4fc164dab0ffb7103e6acb7",
+
+  // Durable Objects
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "SESSION",
+        "class_name": "SessionDO"
+      }
+    ]
+  },
+
+  // DO migrations
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["SessionDO"]
+    }
+  ],
+
+  // KV Namespaces
+  "kv_namespaces": [
+    {
+      "binding": "SESSION_INDEX",
+      "id": "8050cca619384ea9baef9f12c106c94c"
+    }
+  ],
+
+  // Service bindings (optional)
+  // "services": [
+  //   {
+  //     "binding": "SLACK_BOT",
+  //     "service": "dispatch-slack-bot"
+  //   }
+  // ],
+
+  // Environment variables (non-secret)
+  "vars": {
+    "DEPLOYMENT_NAME": "dispatch"
+  }
+
+  // Secrets (set via: wrangler secret put <KEY>)
+  // Required secrets:
+  // - GITHUB_CLIENT_ID
+  // - GITHUB_CLIENT_SECRET
+  // - TOKEN_ENCRYPTION_KEY
+  // - ENCRYPTION_KEY
+  // - MODAL_API_SECRET
+  // - GITHUB_APP_ID
+  // - GITHUB_APP_PRIVATE_KEY
+  // - GITHUB_APP_INSTALLATION_ID
+}
