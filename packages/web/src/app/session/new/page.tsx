@@ -21,7 +21,6 @@ export default function NewSessionPage() {
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [selectedRepo, setSelectedRepo] = useState<string>("");
-  const [title, setTitle] = useState("");
   const [selectedModel, setSelectedModel] = useState<string>(
     "amazon-bedrock/anthropic.claude-opus-4-5-20251101-v1:0"
   );
@@ -86,7 +85,6 @@ export default function NewSessionPage() {
         body: JSON.stringify({
           repoOwner: owner,
           repoName: name,
-          title: title || undefined,
           model: selectedModel,
         }),
       });
@@ -119,8 +117,6 @@ export default function NewSessionPage() {
         repos={repos}
         selectedRepo={selectedRepo}
         setSelectedRepo={setSelectedRepo}
-        title={title}
-        setTitle={setTitle}
         selectedModel={selectedModel}
         setSelectedModel={setSelectedModel}
         models={models}
@@ -136,8 +132,6 @@ function NewSessionContent({
   repos,
   selectedRepo,
   setSelectedRepo,
-  title,
-  setTitle,
   selectedModel,
   setSelectedModel,
   models,
@@ -148,8 +142,6 @@ function NewSessionContent({
   repos: Repo[];
   selectedRepo: string;
   setSelectedRepo: (value: string) => void;
-  title: string;
-  setTitle: (value: string) => void;
   selectedModel: string;
   setSelectedModel: (value: string) => void;
   models: { id: string; name: string; description: string }[];
@@ -207,23 +199,6 @@ function NewSessionContent({
                   No repositories found. Make sure you have granted access to your repositories.
                 </p>
               )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-2">
-                Title (optional)
-              </label>
-              <input
-                type="text"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="e.g., Add user authentication"
-                className="w-full px-4 py-3 border border-border bg-transparent text-foreground focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-secondary-foreground"
-              />
-              <p className="mt-2 text-sm text-muted-foreground">
-                A title helps identify the session. If not provided, the repository name will be
-                used.
-              </p>
             </div>
 
             <div>

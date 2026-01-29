@@ -450,7 +450,7 @@ async function handleCreateSession(
         sessionName: sessionId, // Pass the session name for WebSocket routing
         repoOwner,
         repoName,
-        title: body.title,
+        title: body.title || "New session",
         model: body.model || "claude-haiku-4-5", // Default to haiku for cost efficiency
         userId,
         githubLogin,
@@ -471,7 +471,7 @@ async function handleCreateSession(
     `session:${sessionId}`,
     JSON.stringify({
       id: sessionId,
-      title: body.title || null,
+      title: body.title || "New session",
       repoOwner,
       repoName,
       model: body.model || "claude-haiku-4-5",

@@ -124,11 +124,11 @@ export class SessionDO extends DurableObject<Env> {
   private sandboxWs: WebSocket | null = null;
   private initialized = false;
   private isSpawningSandbox = false;
-  // Track pending push operations by branch name
-  private pendingPushResolvers = new Map<
-    string,
-    { resolve: () => void; reject: (err: Error) => void }
-  >();
+  // Track pending push operation (only one at a time)
+  private pendingPushResolver: {
+    resolve: (branchName: string) => void;
+    reject: (err: Error) => void;
+  } | null = null;
 
   // Route table for internal API endpoints
   private readonly routes: InternalRoute[] = [
@@ -1316,31 +1316,30 @@ export class SessionDO extends DurableObject<Env> {
    * @returns Success result or error message
    */
   private async pushBranchToRemote(
-    branchName: string,
+    suggestedBranchName: string,
     repoOwner: string,
     repoName: string,
     githubToken?: string
-  ): Promise<{ success: true } | { success: false; error: string }> {
+  ): Promise<{ success: true; branchName: string } | { success: false; error: string }> {
     const sandboxWs = this.getSandboxWebSocket();
 
     if (!sandboxWs) {
       // No sandbox connected - user may have already pushed manually
       console.log("[DO] No sandbox connected, assuming branch was pushed manually");
-      return { success: true };
+      return { success: true, branchName: suggestedBranchName };
     }
 
     // Create a promise that will be resolved when push_complete event arrives
-    // Use normalized branch name for map key to handle case/whitespace differences
-    const normalizedBranch = this.normalizeBranchName(branchName);
+    // Returns the actual branch name used (sandbox may have renamed it)
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
-    const pushPromise = new Promise<void>((resolve, reject) => {
-      this.pendingPushResolvers.set(normalizedBranch, { resolve, reject });
+    const pushPromise = new Promise<string>((resolve, reject) => {
+      this.pendingPushResolver = { resolve, reject };
 
       // Timeout after 180 seconds (3 minutes) - git push can take a while
       timeoutId = setTimeout(() => {
-        if (this.pendingPushResolvers.has(normalizedBranch)) {
-          this.pendingPushResolvers.delete(normalizedBranch);
+        if (this.pendingPushResolver) {
+          this.pendingPushResolver = null;
           reject(new Error("Push operation timed out after 180 seconds"));
         }
       }, 180000);
@@ -1349,10 +1348,10 @@ export class SessionDO extends DurableObject<Env> {
     // Tell sandbox to push the current branch
     // Pass GitHub App token for authentication (sandbox uses for git push)
     // User's OAuth token is NOT sent to sandbox - only used server-side for PR API
-    console.log(`[DO] Sending push command for branch ${branchName}`);
+    console.log(`[DO] Sending push command (suggested branch: ${suggestedBranchName})`);
     this.safeSend(sandboxWs, {
       type: "push",
-      branchName,
+      branchName: suggestedBranchName,
       repoOwner,
       repoName,
       githubToken,
@@ -1360,9 +1359,9 @@ export class SessionDO extends DurableObject<Env> {
 
     // Wait for push_complete or push_error event
     try {
-      await pushPromise;
-      console.log(`[DO] Push completed successfully for branch ${branchName}`);
-      return { success: true };
+      const actualBranchName = await pushPromise;
+      console.log(`[DO] Push completed successfully, branch: ${actualBranchName}`);
+      return { success: true, branchName: actualBranchName };
     } catch (pushError) {
       console.error(`[DO] Push failed: ${pushError}`);
       return { success: false, error: `Failed to push branch: ${pushError}` };
@@ -1376,35 +1375,25 @@ export class SessionDO extends DurableObject<Env> {
 
   /**
    * Handle push completion or error events from sandbox.
-   * Resolves or rejects the pending push promise for the branch.
+   * Resolves or rejects the pending push promise with the actual branch name.
    */
   private handlePushEvent(event: SandboxEvent): void {
     const branchName = (event as { branchName?: string }).branchName;
 
-    if (!branchName) {
-      return;
-    }
-
-    const normalizedBranch = this.normalizeBranchName(branchName);
-    const resolver = this.pendingPushResolvers.get(normalizedBranch);
-
-    if (!resolver) {
+    if (!this.pendingPushResolver) {
       return;
     }
 
     if (event.type === "push_complete") {
-      console.log(
-        `[DO] push_complete event: branchName=${branchName}, pendingResolvers=${Array.from(this.pendingPushResolvers.keys()).join(",")}`
-      );
-      console.log(`[DO] Push completed for branch ${branchName}, resolving promise`);
-      resolver.resolve();
+      console.log(`[DO] push_complete event: branchName=${branchName}`);
+      this.pendingPushResolver.resolve(branchName || "unknown");
+      this.pendingPushResolver = null;
     } else if (event.type === "push_error") {
       const error = (event as { error?: string }).error || "Push failed";
-      console.log(`[DO] Push failed for branch ${branchName}: ${error}`);
-      resolver.reject(new Error(error));
+      console.log(`[DO] Push failed: ${error}`);
+      this.pendingPushResolver.reject(new Error(error));
+      this.pendingPushResolver = null;
     }
-
-    this.pendingPushResolvers.delete(normalizedBranch);
   }
 
   /**
@@ -2588,7 +2577,7 @@ export class SessionDO extends DurableObject<Env> {
 
       const baseBranch = body.baseBranch || repoInfo.defaultBranch;
       const sessionId = session.session_name || session.id;
-      const headBranch = generateBranchName(sessionId);
+      const suggestedBranch = generateBranchName(sessionId);
 
       // Generate GitHub App token for push (not user token)
       // User token is only used for PR API call below
@@ -2604,8 +2593,9 @@ export class SessionDO extends DurableObject<Env> {
       }
 
       // Push branch to remote via sandbox
+      // The sandbox returns the actual branch name (agent may have renamed it)
       const pushResult = await this.pushBranchToRemote(
-        headBranch,
+        suggestedBranch,
         session.repo_owner,
         session.repo_name,
         pushToken
@@ -2615,10 +2605,14 @@ export class SessionDO extends DurableObject<Env> {
         return Response.json({ error: pushResult.error }, { status: 500 });
       }
 
+      // Use the actual branch name from the sandbox (may differ from suggested)
+      const headBranch = pushResult.branchName;
+      console.log(`[DO] Using branch name for PR: ${headBranch}`);
+
       // Append session link footer to agent's PR body
       const webAppUrl = this.env.WEB_APP_URL || this.env.WORKER_URL || "";
       const sessionUrl = `${webAppUrl}/session/${sessionId}`;
-      const fullBody = body.body + `\n\n---\n*Created with [Modal Sandbox](${sessionUrl})*`;
+      const fullBody = body.body + `\n\n---\n*Created with [Dispatch](${sessionUrl})*`;
 
       // Create the PR using GitHub API (using the prompting user's token)
       const prResult = await createPullRequest(

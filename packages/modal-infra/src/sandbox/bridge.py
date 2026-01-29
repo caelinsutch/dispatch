@@ -938,15 +938,16 @@ class AgentBridge:
             return TokenResolution("", "none")
 
     async def _handle_push(self, cmd: dict[str, Any]) -> None:
-        """Handle push command - push current branch to GitHub."""
-        branch_name = cmd.get("branchName", "")
+        """Handle push command - push current branch to GitHub.
+
+        Gets the actual current branch name from git (in case agent renamed it)
+        and reports it back in the push_complete event.
+        """
+        fallback_branch = cmd.get("branchName", "")
         repo_owner = cmd.get("repoOwner") or os.environ.get("REPO_OWNER", "")
         repo_name = cmd.get("repoName") or os.environ.get("REPO_NAME", "")
 
         github_token, token_source = self._resolve_github_token(cmd)
-        print(
-            f"[bridge] Pushing branch: {branch_name} to {repo_owner}/{repo_name} (token: {token_source})"
-        )
 
         repo_dirs = list(self.repo_path.glob("*/.git"))
         if not repo_dirs:
@@ -960,6 +961,32 @@ class AgentBridge:
             return
 
         repo_dir = repo_dirs[0].parent
+
+        # Get the actual current branch name from git (agent may have renamed it)
+        branch_name = fallback_branch
+        try:
+            result = await asyncio.create_subprocess_exec(
+                "git",
+                "rev-parse",
+                "--abbrev-ref",
+                "HEAD",
+                cwd=repo_dir,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            stdout, _ = await result.communicate()
+            current_branch = stdout.decode().strip()
+            if current_branch and current_branch != "HEAD":
+                branch_name = current_branch
+                print(f"[bridge] Detected current branch: {branch_name}")
+            else:
+                print(f"[bridge] Could not detect branch, using fallback: {fallback_branch}")
+        except Exception as e:
+            print(f"[bridge] Failed to get current branch: {e}, using fallback: {fallback_branch}")
+
+        print(
+            f"[bridge] Pushing branch: {branch_name} to {repo_owner}/{repo_name} (token: {token_source})"
+        )
 
         try:
             refspec = f"HEAD:refs/heads/{branch_name}"
