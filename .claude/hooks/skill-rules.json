@@ -1,0 +1,158 @@
+{
+	"version": "1.0",
+	"config": {
+		"minConfidenceScore": 3,
+		"showMatchReasons": true,
+		"maxSkillsToShow": 3
+	},
+	"scoring": {
+		"keyword": 2,
+		"keywordPattern": 3,
+		"pathPattern": 4,
+		"directoryMatch": 5,
+		"intentPattern": 4,
+		"contentPattern": 3,
+		"contextPattern": 2
+	},
+	"directoryMappings": {
+		"packages/web/src/components": "vercel-react-best-practices",
+		"packages/web/src/app": "vercel-react-best-practices",
+		"packages/web": "vercel-react-best-practices"
+	},
+	"skills": {
+		"vercel-react-best-practices": {
+			"description": "React best practices from Vercel including hooks, components, and patterns",
+			"priority": 10,
+			"triggers": {
+				"keywords": [
+					"react",
+					"component",
+					"hook",
+					"useState",
+					"useEffect",
+					"useCallback",
+					"useMemo",
+					"context",
+					"provider",
+					"props",
+					"state"
+				],
+				"keywordPatterns": [
+					"\\breact\\b",
+					"\\bcomponent\\b",
+					"\\bhook\\b",
+					"\\buse[A-Z]\\w+\\b"
+				],
+				"pathPatterns": [
+					"**/*.tsx",
+					"**/*.jsx",
+					"**/components/**",
+					"**/hooks/**"
+				],
+				"intentPatterns": [
+					"(?:create|build|add|make).*(?:component|hook|page)",
+					"(?:refactor|improve|optimize).*(?:component|react)",
+					"(?:fix|debug).*(?:render|state|props)"
+				],
+				"contentPatterns": [
+					"useState",
+					"useEffect",
+					"useCallback",
+					"useMemo",
+					"useContext",
+					"forwardRef",
+					"React\\.FC"
+				]
+			},
+			"relatedSkills": ["vercel-composition-patterns", "web-design-guidelines"]
+		},
+		"web-design-guidelines": {
+			"description": "Web design guidelines for UI/UX, styling, and visual design",
+			"priority": 9,
+			"triggers": {
+				"keywords": [
+					"design",
+					"style",
+					"css",
+					"tailwind",
+					"ui",
+					"ux",
+					"layout",
+					"responsive",
+					"mobile",
+					"theme",
+					"color",
+					"typography",
+					"spacing"
+				],
+				"keywordPatterns": [
+					"\\bdesign\\b",
+					"\\bstyle\\b",
+					"\\bcss\\b",
+					"\\btailwind\\b",
+					"\\blayout\\b"
+				],
+				"pathPatterns": [
+					"**/*.css",
+					"**/styles/**",
+					"**/tailwind.config.*"
+				],
+				"intentPatterns": [
+					"(?:style|design|make).*(?:look|better|nice|beautiful)",
+					"(?:add|change|update).*(?:style|css|color|theme)",
+					"(?:responsive|mobile).*(?:design|layout)"
+				],
+				"contentPatterns": [
+					"className=",
+					"tailwind",
+					"bg-",
+					"text-",
+					"flex",
+					"grid"
+				]
+			},
+			"relatedSkills": ["vercel-react-best-practices"]
+		},
+		"vercel-composition-patterns": {
+			"description": "Component composition patterns including compound components, render props, and HOCs",
+			"priority": 8,
+			"triggers": {
+				"keywords": [
+					"composition",
+					"compound",
+					"render prop",
+					"hoc",
+					"higher order",
+					"children",
+					"slots",
+					"polymorphic",
+					"as prop"
+				],
+				"keywordPatterns": [
+					"\\bcomposition\\b",
+					"\\bcompound\\b",
+					"\\brender.?prop\\b",
+					"\\bhoc\\b",
+					"\\bpolymorphic\\b"
+				],
+				"pathPatterns": [
+					"**/components/**",
+					"**/ui/**"
+				],
+				"intentPatterns": [
+					"(?:create|build).*(?:reusable|flexible|composable)",
+					"(?:compound|composition).*(?:component|pattern)",
+					"(?:polymorphic|as prop)"
+				],
+				"contentPatterns": [
+					"children",
+					"React\\.Children",
+					"cloneElement",
+					"as:",
+					"render\\("
+				]
+			},
+			"relatedSkills": ["vercel-react-best-practices"]
+		}
+	}
+}

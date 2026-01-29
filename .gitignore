@@ -73,7 +73,7 @@ coverage/
 # AI Coding Assistants
 .agent/
 .agents/
-.claude/
+.claude/settings.local.json
 .cline/
 .codebuddy/
 .codex/
