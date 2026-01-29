@@ -117,6 +117,27 @@ class SandboxSupervisor:
 
             print(f"[supervisor] Repository cloned successfully to {self.repo_path}")
 
+            # Create and checkout the session branch
+            session_id = self.session_config.get("session_id", "")
+            if session_id:
+                branch_name = f"dispatch/{session_id}"
+                result = await asyncio.create_subprocess_exec(
+                    "git",
+                    "checkout",
+                    "-b",
+                    branch_name,
+                    cwd=self.repo_path,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+                stdout, stderr = await result.communicate()
+                if result.returncode == 0:
+                    print(f"[supervisor] Created and checked out branch: {branch_name}")
+                else:
+                    print(f"[supervisor] Warning: Failed to create branch {branch_name}: {stderr.decode()}")
+            else:
+                print("[supervisor] Warning: No session_id, working on default branch")
+
         try:
             # Configure remote URL with auth token if available
             if self.github_app_token:
@@ -203,15 +224,45 @@ class SandboxSupervisor:
         """Start OpenCode server with configuration."""
         print("[supervisor] Starting OpenCode server...")
 
+        # Get session info for instructions
+        session_id = self.session_config.get("session_id", "")
+        branch_name = f"dispatch/{session_id}" if session_id else "current branch"
+
+        # Build instructions with dynamic branch name
+        instructions = (
+            "# Dispatch Sandbox Environment\n\n"
+            "## Git Workflow\n\n"
+            f"You are working on branch `{branch_name}`. This branch has been created for this session.\n\n"
+            "**Committing Changes:**\n"
+            "- Make commits freely - all changes stay on your session branch\n"
+            "- Use descriptive commit messages\n"
+            "- Commit early and often to save your progress\n\n"
+            "**Creating Pull Requests:**\n"
+            "- Do NOT use `git push` or `gh pr create` directly\n"
+            "- Use the `create-pull-request` tool when ready to submit your changes\n"
+            "- The tool handles pushing and PR creation with proper authentication\n"
+            "- The PR will be created under the user's GitHub account\n\n"
+            "**Important:**\n"
+            "- Never force push or rebase\n"
+            "- Don't switch branches - stay on the current session branch\n"
+            "- The base branch for PRs defaults to the repo's default branch (main/master)\n\n"
+            "## Live Preview\n\n"
+            "Port 3000 is exposed for live preview. When running dev servers or web apps, use port 3000.\n\n"
+            "Examples:\n"
+            "- `npm run dev -- --port 3000`\n"
+            "- `bun run dev --port 3000`\n"
+            "- `python -m http.server 3000`\n"
+            "- `next dev -p 3000`\n\n"
+            "The tunnel URL is automatically available to users viewing this session."
+        )
+
         # Build OpenCode config from session settings
         # HARDCODED: Always use Bedrock until model selector is fixed
         # TODO: Remove hardcoding once web app model selector uses correct Bedrock model IDs
         opencode_config = {
             "model": "amazon-bedrock/anthropic.claude-opus-4-5-20251101-v1:0",
             "small_model": "amazon-bedrock/anthropic.claude-3-5-haiku-20241022-v1:0",
-            "instructions": [
-                "# Live Preview\n\nPort 3000 is exposed for live preview via the tunnel URL. When running development servers, web applications, or any service that should be accessible externally, use port 3000. This is the ONLY port exposed to the outside world.\n\nExamples:\n- `npm run dev -- --port 3000`\n- `bun run dev --port 3000`\n- `python -m http.server 3000`\n- `next dev -p 3000`\n\nThe tunnel URL will be automatically available to users viewing this session."
-            ],
+            "instructions": [instructions],
         }
         print(f"[supervisor] Using hardcoded Bedrock models (requested: {self.session_config.get('provider')}/{self.session_config.get('model')})")
 
