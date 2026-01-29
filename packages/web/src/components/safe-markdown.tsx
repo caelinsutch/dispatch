@@ -11,7 +11,7 @@ interface SafeMarkdownProps {
 
 export function SafeMarkdown({ content, className = "", isStreaming = false }: SafeMarkdownProps) {
   return (
-    <div className={`prose prose-sm dark:prose-invert max-w-none ${className}`}>
+    <div className={`prose prose-sm dark:prose-invert max-w-none text-foreground ${className}`}>
       <Streamdown plugins={{ code }} isAnimating={isStreaming}>
         {content}
       </Streamdown>

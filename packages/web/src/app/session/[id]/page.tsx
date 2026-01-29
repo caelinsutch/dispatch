@@ -37,6 +37,7 @@ type EventGroup =
 function groupEvents(events: SandboxEvent[]): EventGroup[] {
   const groups: EventGroup[] = [];
   let currentToolGroup: SandboxEvent[] = [];
+  let eventCounter = 0; // Counter for unique keys
 
   const flushToolGroup = () => {
     if (currentToolGroup.length > 0) {
@@ -67,10 +68,11 @@ function groupEvents(events: SandboxEvent[]): EventGroup[] {
       }
     } else {
       flushToolGroup();
+      eventCounter++;
       groups.push({
         type: "single",
         event,
-        id: `single-${event.type}-${event.messageId || event.callId || event.timestamp}`,
+        id: `single-${event.type}-${event.messageId || event.callId || event.timestamp}-${eventCounter}`,
       });
     }
   }
@@ -802,7 +804,7 @@ function EventItem({
             </div>
             <span className="text-xs text-secondary-foreground">{time}</span>
           </div>
-          <pre className="whitespace-pre-wrap text-sm text-foreground">{event.content}</pre>
+          <SafeMarkdown content={event.content} className="text-sm" />
         </div>
       );
     }

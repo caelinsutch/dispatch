@@ -9,12 +9,15 @@ using .remote() to avoid nested Modal function calls.
 
 SECURITY: All sensitive endpoints require authentication via HMAC-signed tokens.
 The control plane must include an Authorization header with a valid token.
+
+CONSOLIDATION: All endpoints are combined into a single FastAPI app to stay
+within Modal's 8 endpoint per workspace limit.
 """
 
 import os
 
-from fastapi import Header, HTTPException
-from modal import fastapi_endpoint
+from fastapi import APIRouter, FastAPI, Header, HTTPException
+from modal import asgi_app
 
 from .app import (
     app,
@@ -68,13 +71,18 @@ def require_valid_control_plane_url(url: str | None) -> None:
         )
 
 
-@app.function(
-    image=function_image,
-    volumes={"/data": inspect_volume},
-    secrets=[github_app_secrets, internal_api_secret],
-)
-@fastapi_endpoint(method="POST")
-async def api_create_sandbox(
+# Create FastAPI app and router
+router = APIRouter()
+
+
+@router.get("/health")
+def health() -> dict:
+    """Health check endpoint. Does not require authentication."""
+    return {"success": True, "data": {"status": "healthy", "service": "dispatch-modal"}}
+
+
+@router.post("/sandbox/create")
+async def create_sandbox(
     request: dict,
     authorization: str | None = Header(None),
 ) -> dict:
@@ -175,13 +183,8 @@ async def api_create_sandbox(
         return {"success": False, "error": str(e)}
 
 
-@app.function(
-    image=function_image,
-    volumes={"/data": inspect_volume},
-    secrets=[internal_api_secret],
-)
-@fastapi_endpoint(method="POST")
-async def api_warm_sandbox(
+@router.post("/sandbox/warm")
+async def warm_sandbox(
     request: dict,
     authorization: str | None = Header(None),
 ) -> dict:
@@ -226,20 +229,8 @@ async def api_warm_sandbox(
         return {"success": False, "error": str(e)}
 
 
-@app.function(image=function_image)
-@fastapi_endpoint(method="GET")
-def api_health() -> dict:
-    """Health check endpoint. Does not require authentication."""
-    return {"success": True, "data": {"status": "healthy", "service": "dispatch-modal"}}
-
-
-@app.function(
-    image=function_image,
-    volumes={"/data": inspect_volume},
-    secrets=[internal_api_secret],
-)
-@fastapi_endpoint(method="GET")
-def api_snapshot(
+@router.get("/snapshot")
+def get_snapshot(
     repo_owner: str,
     repo_name: str,
     authorization: str | None = Header(None),
@@ -269,9 +260,8 @@ def api_snapshot(
         return {"success": False, "error": str(e)}
 
 
-@app.function(image=function_image, secrets=[internal_api_secret])
-@fastapi_endpoint(method="POST")
-async def api_snapshot_sandbox(
+@router.post("/sandbox/snapshot")
+async def snapshot_sandbox(
     request: dict,
     authorization: str | None = Header(None),
 ) -> dict:
@@ -344,9 +334,8 @@ async def api_snapshot_sandbox(
         return {"success": False, "error": str(e)}
 
 
-@app.function(image=function_image, secrets=[github_app_secrets, internal_api_secret])
-@fastapi_endpoint(method="POST")
-async def api_restore_sandbox(
+@router.post("/sandbox/restore")
+async def restore_sandbox(
     request: dict,
     authorization: str | None = Header(None),
 ) -> dict:
@@ -429,3 +418,20 @@ async def api_restore_sandbox(
 
         traceback.print_exc()
         return {"success": False, "error": str(e)}
+
+
+# Create FastAPI app and mount router
+api_app = FastAPI(title="Dispatch Modal API")
+api_app.include_router(router)
+
+
+# Single Modal function that serves all routes
+@app.function(
+    image=function_image,
+    volumes={"/data": inspect_volume},
+    secrets=[github_app_secrets, internal_api_secret],
+)
+@asgi_app()
+def api():
+    """Single consolidated API endpoint serving all routes."""
+    return api_app

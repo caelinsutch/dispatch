@@ -90,13 +90,14 @@ export class ModalClient {
       throw new Error("ModalClient requires MODAL_WORKSPACE for URL construction");
     }
     this.secret = secret;
-    const baseUrl = getModalBaseUrl(workspace);
-    this.createSandboxUrl = `${baseUrl}-api-create-sandbox.modal.run`;
-    this.warmSandboxUrl = `${baseUrl}-api-warm-sandbox.modal.run`;
-    this.healthUrl = `${baseUrl}-api-health.modal.run`;
-    this.snapshotUrl = `${baseUrl}-api-snapshot.modal.run`;
-    this.snapshotSandboxUrl = `${baseUrl}-api-snapshot-sandbox.modal.run`;
-    this.restoreSandboxUrl = `${baseUrl}-api-restore-sandbox.modal.run`;
+    // All endpoints consolidated under single FastAPI app
+    const apiBase = `${getModalBaseUrl(workspace)}-api.modal.run`;
+    this.createSandboxUrl = `${apiBase}/sandbox/create`;
+    this.warmSandboxUrl = `${apiBase}/sandbox/warm`;
+    this.healthUrl = `${apiBase}/health`;
+    this.snapshotUrl = `${apiBase}/snapshot`;
+    this.snapshotSandboxUrl = `${apiBase}/sandbox/snapshot`;
+    this.restoreSandboxUrl = `${apiBase}/sandbox/restore`;
   }
 
   /**

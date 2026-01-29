@@ -115,23 +115,23 @@ modal run src/
 The control plane communicates with Modal via HTTP endpoints. All endpoints (except health)
 require HMAC authentication via the `Authorization` header.
 
-Endpoint URLs follow the pattern: `https://{workspace}--dispatch-{endpoint}.modal.run`
+All routes are served from a single FastAPI app: `https://{workspace}--dispatch-api.modal.run`
 
 ### Endpoints
 
-| Endpoint | Method | Auth | Description |
-|----------|--------|------|-------------|
-| `api-health` | GET | No | Health check |
-| `api-create-sandbox` | POST | Yes | Create a new sandbox |
-| `api-warm-sandbox` | POST | Yes | Pre-warm a sandbox |
-| `api-snapshot` | GET | Yes | Get latest snapshot for a repo |
-| `api-snapshot-sandbox` | POST | Yes | Take filesystem snapshot |
-| `api-restore-sandbox` | POST | Yes | Restore sandbox from snapshot |
+| Path | Method | Auth | Description |
+|------|--------|------|-------------|
+| `/health` | GET | No | Health check |
+| `/sandbox/create` | POST | Yes | Create a new sandbox |
+| `/sandbox/warm` | POST | Yes | Pre-warm a sandbox |
+| `/snapshot` | GET | Yes | Get latest snapshot for a repo |
+| `/sandbox/snapshot` | POST | Yes | Take filesystem snapshot |
+| `/sandbox/restore` | POST | Yes | Restore sandbox from snapshot |
 
 ### Example: Create Sandbox
 
 ```bash
-curl -X POST "https://${WORKSPACE}--dispatch-api-create-sandbox.modal.run" \
+curl -X POST "https://${WORKSPACE}--dispatch-api.modal.run/sandbox/create" \
   -H "Authorization: Bearer ${TOKEN}" \
   -H "Content-Type: application/json" \
   -d '{
@@ -146,7 +146,7 @@ curl -X POST "https://${WORKSPACE}--dispatch-api-create-sandbox.modal.run" \
 ### Example: Health Check
 
 ```bash
-curl "https://${WORKSPACE}--dispatch-api-health.modal.run"
+curl "https://${WORKSPACE}--dispatch-api.modal.run/health"
 # {"success": true, "data": {"status": "healthy", "service": "dispatch-modal"}}
 ```
 
@@ -168,8 +168,8 @@ Set via Modal secrets:
 | Criterion | Test Method |
 |-----------|-------------|
 | App deploys successfully | `modal deploy deploy.py` completes without errors |
-| Health endpoint responds | `curl https://{workspace}--dispatch-api-health.modal.run` |
-| Sandbox creation works | POST to `api-create-sandbox` returns success |
+| Health endpoint responds | `curl https://{workspace}--dispatch-api.modal.run/health` |
+| Sandbox creation works | POST to `/sandbox/create` returns success |
 | Git sync completes | Verify HEAD matches origin after sandbox start |
 | Snapshot/restore works | Take snapshot, restore, verify workspace state |
 
