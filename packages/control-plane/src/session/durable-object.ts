@@ -1306,6 +1306,39 @@ export class SessionDO extends DurableObject<Env> {
       }
     }
 
+    // Handle port detection events for live preview
+    if (event.type === "port_detected") {
+      const port = (event as { port: number }).port;
+      console.log(`[DO] Port detected: ${port}`);
+
+      // Get current active ports and add the new one
+      const sandbox = this.sql.exec(`SELECT active_ports FROM sandbox LIMIT 1`).toArray()[0] as
+        | { active_ports: string | null }
+        | undefined;
+
+      let activePorts: number[] = [];
+      if (sandbox?.active_ports) {
+        try {
+          activePorts = JSON.parse(sandbox.active_ports);
+        } catch {
+          // Ignore parse errors
+        }
+      }
+
+      if (!activePorts.includes(port)) {
+        activePorts.push(port);
+        activePorts.sort((a, b) => a - b);
+
+        this.sql.exec(
+          `UPDATE sandbox SET active_ports = ? WHERE id = (SELECT id FROM sandbox LIMIT 1)`,
+          JSON.stringify(activePorts)
+        );
+
+        // Broadcast active ports update to all clients
+        this.broadcast({ type: "active_ports_updated", activePorts });
+      }
+    }
+
     // Broadcast to clients
     this.broadcast({ type: "sandbox_event", event });
   }
@@ -1847,6 +1880,15 @@ export class SessionDO extends DurableObject<Env> {
       }
     }
 
+    let activePorts: number[] | undefined;
+    if (sandbox?.active_ports) {
+      try {
+        activePorts = JSON.parse(sandbox.active_ports);
+      } catch (e) {
+        console.error("[DO] Failed to parse active_ports:", e);
+      }
+    }
+
     return {
       id: session?.id ?? this.ctx.id.toString(),
       title: session?.title ?? null,
@@ -1860,6 +1902,7 @@ export class SessionDO extends DurableObject<Env> {
       isProcessing,
       model: session?.model,
       tunnelUrls,
+      activePorts,
     };
   }
 

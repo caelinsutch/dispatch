@@ -20,8 +20,9 @@ from ..app import app, llm_secrets
 from ..images.base import base_image
 from .types import SandboxStatus, SessionConfig
 
-# Port to expose via Modal Tunnel for live preview
-PREVIEW_PORTS = [3000]
+# Ports to expose via Modal Tunnel for live preview
+# Common dev server ports - tunnels are created at sandbox startup
+PREVIEW_PORTS = [3000, 3001, 5000, 5173, 8000, 8080]
 
 
 @dataclass

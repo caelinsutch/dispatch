@@ -13,6 +13,7 @@ import argparse
 import asyncio
 import json
 import os
+import re
 import secrets
 import subprocess
 import tempfile
@@ -26,6 +27,20 @@ import websockets
 from websockets import ClientConnection, State
 
 from .types import GitUser
+
+
+# Match localhost URLs with or without http:// prefix
+# Examples: http://localhost:3000, localhost:3000, 127.0.0.1:8080
+LOCALHOST_URL_PATTERN = re.compile(
+    r"(?:https?://)?(?:localhost|127\.0\.0\.1|0\.0\.0\.0):(\d+)"
+)
+
+
+def extract_localhost_ports(text: str) -> set[int]:
+    """Extract port numbers from localhost URLs in text."""
+    matches = LOCALHOST_URL_PATTERN.findall(text)
+    # Filter to valid port range
+    return {int(port) for port in matches if 1024 <= int(port) <= 65535}
 
 
 class TokenResolution(NamedTuple):
@@ -150,6 +165,9 @@ class AgentBridge:
 
         # HTTP client for OpenCode API
         self.http_client: httpx.AsyncClient | None = None
+
+        # Track detected localhost ports for live preview
+        self.detected_ports: set[int] = set()
 
     @property
     def ws_url(self) -> str:
@@ -276,6 +294,25 @@ class AgentBridge:
             print(f"[bridge] Sent event: {event_type}")
         except Exception as e:
             print(f"[bridge] Failed to send {event_type} event: {e}")
+
+    def _scan_for_ports(self, text: str, message_id: str) -> None:
+        """Scan text for localhost URLs and emit events for new ports."""
+        ports = extract_localhost_ports(text)
+        new_ports = ports - self.detected_ports
+
+        for port in new_ports:
+            self.detected_ports.add(port)
+            print(f"[bridge] Detected localhost port: {port}")
+            # Queue event to send to control plane
+            asyncio.create_task(self._send_detected_port(port, message_id))
+
+    async def _send_detected_port(self, port: int, message_id: str) -> None:
+        """Send port_detected event to control plane."""
+        await self._send_event({
+            "type": "port_detected",
+            "port": port,
+            "messageId": message_id,
+        })
 
     async def _handle_command(self, cmd: dict[str, Any]) -> asyncio.Task[None] | None:
         """Handle command from control plane.
@@ -450,13 +487,20 @@ class AgentBridge:
             if part.get("id"):
                 args["id"] = part.get("id")
 
+            tool_name = part.get("tool", "")
+            output = state.get("output", "")
+
+            # Scan Bash tool outputs for localhost URLs (for live preview)
+            if tool_name == "Bash" and output:
+                self._scan_for_ports(output, message_id)
+
             return {
                 "type": "tool_call",
-                "tool": part.get("tool", ""),
+                "tool": tool_name,
                 "args": args,
                 "callId": part.get("callID", ""),
                 "status": status,
-                "output": state.get("output", ""),
+                "output": output,
                 "messageId": message_id,
             }
         elif part_type == "step-finish":

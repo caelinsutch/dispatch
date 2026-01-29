@@ -116,7 +116,8 @@ export type ServerMessage =
   | { type: "sandbox_restored"; message: string }
   | { type: "sandbox_warning"; message: string }
   | { type: "session_status"; status: SessionStatus }
-  | { type: "processing_status"; isProcessing: boolean };
+  | { type: "processing_status"; isProcessing: boolean }
+  | { type: "active_ports_updated"; activePorts: number[] };
 
 // Sandbox events (from Modal)
 export type SandboxEvent =
@@ -187,6 +188,13 @@ export type SandboxEvent =
       messageId: string;
       sandboxId?: string;
       timestamp?: number;
+    }
+  | {
+      type: "port_detected";
+      port: number;
+      messageId: string;
+      sandboxId?: string;
+      timestamp?: number;
     };
 
 // Attachment
@@ -212,6 +220,7 @@ export interface SessionState {
   isProcessing: boolean;
   model?: string;
   tunnelUrls?: Record<number, string>;
+  activePorts?: number[];
 }
 
 // Participant presence

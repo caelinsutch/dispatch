@@ -2,10 +2,15 @@
 
 interface PreviewSectionProps {
   tunnelUrls: Record<number, string>;
+  activePorts?: number[];
 }
 
-export function PreviewSection({ tunnelUrls }: PreviewSectionProps) {
-  const entries = Object.entries(tunnelUrls).sort(([a], [b]) => Number(a) - Number(b));
+export function PreviewSection({ tunnelUrls, activePorts }: PreviewSectionProps) {
+  // Filter to only show active ports (detected in output)
+  // If no ports detected yet, show nothing
+  const entries = Object.entries(tunnelUrls)
+    .filter(([port]) => activePorts?.includes(Number(port)))
+    .sort(([a], [b]) => Number(a) - Number(b));
 
   if (entries.length === 0) {
     return null;
