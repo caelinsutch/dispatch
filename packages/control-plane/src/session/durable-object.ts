@@ -221,7 +221,8 @@ export class SessionDO extends DurableObject<Env> {
     const path = url.pathname;
 
     // WebSocket upgrade (special case - header-based, not path-based)
-    if (request.headers.get("Upgrade") === "websocket") {
+    // Use case-insensitive check per HTTP spec
+    if (request.headers.get("Upgrade")?.toLowerCase() === "websocket") {
       return this.handleWebSocketUpgrade(request, url);
     }
 
@@ -1592,8 +1593,17 @@ export class SessionDO extends DurableObject<Env> {
     const now = Date.now();
     const timeSinceLastSpawn = now - lastSpawnTime;
 
+    // Helper to broadcast actual status when returning early
+    // This prevents UI from staying stuck at "warming" when spawn is skipped
+    const broadcastCurrentStatus = () => {
+      if (currentStatus && currentStatus !== "warming") {
+        this.broadcast({ type: "sandbox_status", status: currentStatus });
+      }
+    };
+
     // Check circuit breaker
     if (!this.enforceCircuitBreaker(spawnFailureCount, lastSpawnFailure)) {
+      broadcastCurrentStatus();
       return;
     }
 
@@ -1609,9 +1619,19 @@ export class SessionDO extends DurableObject<Env> {
     }
 
     // Don't spawn if already spawning or connecting (persisted check)
+    // But allow re-spawn if stuck in these states for too long (2 minutes)
+    const SPAWN_STATE_TIMEOUT_MS = 120000; // 2 minutes
     if (currentStatus === "spawning" || currentStatus === "connecting") {
-      console.log(`[DO] spawnSandbox: already ${currentStatus}, skipping`);
-      return;
+      if (timeSinceLastSpawn < SPAWN_STATE_TIMEOUT_MS) {
+        console.log(`[DO] spawnSandbox: already ${currentStatus}, skipping`);
+        broadcastCurrentStatus();
+        return;
+      }
+      // Sandbox has been stuck in spawning/connecting for too long - reset and allow fresh spawn
+      console.log(
+        `[DO] spawnSandbox: stuck in ${currentStatus} for ${timeSinceLastSpawn / 1000}s, resetting`
+      );
+      this.updateSandboxStatus("failed");
     }
 
     // Don't spawn if status is "ready" and we have an active WebSocket
@@ -1619,6 +1639,7 @@ export class SessionDO extends DurableObject<Env> {
       const existingSandboxWs = this.getSandboxWebSocket();
       if (existingSandboxWs) {
         console.log("[DO] spawnSandbox: sandbox ready with active WebSocket, skipping");
+        broadcastCurrentStatus();
         return;
       }
       // If no WebSocket but was recently spawned, wait for reconnect
@@ -1626,6 +1647,7 @@ export class SessionDO extends DurableObject<Env> {
         console.log(
           `[DO] spawnSandbox: status ready but no WebSocket, last spawn was ${timeSinceLastSpawn / 1000}s ago, waiting`
         );
+        broadcastCurrentStatus();
         return;
       }
     }
@@ -1633,12 +1655,14 @@ export class SessionDO extends DurableObject<Env> {
     // Cooldown: don't spawn if last spawn was within 30 seconds
     if (timeSinceLastSpawn < 30000 && currentStatus !== "failed" && currentStatus !== "stopped") {
       console.log(`[DO] spawnSandbox: last spawn was ${timeSinceLastSpawn / 1000}s ago, waiting`);
+      broadcastCurrentStatus();
       return;
     }
 
     // Also check in-memory flag for same-request protection
     if (this.isSpawningSandbox) {
       console.log("[DO] spawnSandbox: isSpawningSandbox=true, skipping");
+      broadcastCurrentStatus();
       return;
     }
     this.isSpawningSandbox = true;

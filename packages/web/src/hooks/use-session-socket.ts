@@ -309,7 +309,7 @@ export function useSessionSocket(sessionId: string): UseSessionSocketReturn {
         return null;
       }
 
-      const data = await response.json();
+      const data = (await response.json()) as { token: string };
       return data.token;
     } catch (error) {
       console.error("Failed to fetch WS token:", error);

@@ -39,7 +39,7 @@ export function SessionSidebar({ onNewSession, onToggle }: SessionSidebarProps) 
     try {
       const res = await fetch("/api/sessions");
       if (res.ok) {
-        const data = await res.json();
+        const data = (await res.json()) as { sessions?: SessionItem[] };
         setSessions(data.sessions || []);
       }
     } catch (error) {
