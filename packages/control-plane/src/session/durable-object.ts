@@ -8,7 +8,14 @@
  */
 
 import { DurableObject } from "cloudflare:workers";
-import { generateBranchName, generateInternalToken } from "@dispatch/shared";
+import {
+  DEFAULT_MODEL,
+  DEFAULT_PROVIDER,
+  generateBranchName,
+  generateInternalToken,
+  getBedrockModelId,
+  isValidModel,
+} from "@dispatch/shared";
 import { decryptToken, generateId, hashToken } from "../auth/crypto";
 import { generateInstallationToken, getGitHubAppConfig } from "../auth/github-app";
 import { createPullRequest, getRepository } from "../auth/pr";
@@ -50,12 +57,6 @@ function getGitHubAvatarUrl(githubLogin: string | null | undefined): string | un
 }
 
 /**
- * Valid model names for the LLM.
- */
-const VALID_MODELS = ["claude-haiku-4-5", "claude-sonnet-4-5", "claude-opus-4-5"] as const;
-type ValidModel = (typeof VALID_MODELS)[number];
-
-/**
  * Valid event types for filtering.
  * Includes both external types (from types.ts) and internal types used by the sandbox.
  */
@@ -77,18 +78,6 @@ const VALID_EVENT_TYPES = [
 const VALID_MESSAGE_STATUSES = ["pending", "processing", "completed", "failed"] as const;
 
 /**
- * Check if a model name is valid.
- */
-function isValidModel(model: string): model is ValidModel {
-  return VALID_MODELS.includes(model as ValidModel);
-}
-
-/**
- * Default model to use when none specified or invalid.
- */
-const DEFAULT_MODEL: ValidModel = "claude-haiku-4-5";
-
-/**
  * Timeout for WebSocket authentication (in milliseconds).
  * Client WebSockets must send a valid 'subscribe' message within this time
  * or the connection will be closed. This prevents resource abuse from
@@ -97,16 +86,18 @@ const DEFAULT_MODEL: ValidModel = "claude-haiku-4-5";
 const WS_AUTH_TIMEOUT_MS = 30000; // 30 seconds
 
 /**
- * Extract provider and model from a model ID.
- * Models with "/" have embedded provider (kept for backward compatibility with existing sessions).
- * Models like "claude-haiku-4-5" use "anthropic" as default provider.
+ * Extract provider and Bedrock model ID from a canonical model ID.
+ * Converts canonical IDs like "claude-opus-4-5" to Bedrock IDs.
+ * Legacy format with "/" is preserved for backward compatibility.
  */
 function extractProviderAndModel(modelId: string): { provider: string; model: string } {
+  // Legacy format: "amazon-bedrock/anthropic.claude-..." - preserve as-is
   if (modelId.includes("/")) {
     const [provider, ...modelParts] = modelId.split("/");
     return { provider, model: modelParts.join("/") };
   }
-  return { provider: "anthropic", model: modelId };
+  // Canonical format: "claude-opus-4-5" -> Bedrock ID
+  return { provider: DEFAULT_PROVIDER, model: getBedrockModelId(modelId) };
 }
 
 /**
@@ -1516,12 +1507,17 @@ export class SessionDO extends DurableObject<Env> {
     // Get session for default model
     const session = this.getSession();
 
+    // Resolve model to full Bedrock format (provider/modelId)
+    const rawModel = message.model || session?.model || DEFAULT_MODEL;
+    const { provider, model: bedrockModel } = extractProviderAndModel(rawModel);
+    const fullModelId = `${provider}/${bedrockModel}`;
+
     // Send to sandbox with model (per-message override or session default)
     const command: SandboxCommand = {
       type: "prompt",
       messageId: message.id,
       content: message.content,
-      model: message.model || session?.model || "claude-haiku-4-5",
+      model: fullModelId,
       author: {
         userId: author?.user_id ?? "unknown",
         githubName: author?.github_name ?? null,
@@ -1720,7 +1716,9 @@ export class SessionDO extends DurableObject<Env> {
           result.modalObjectId || null,
           result.tunnelUrls ? JSON.stringify(result.tunnelUrls) : null
         );
-        console.log(`[DO] Stored modal_object_id: ${result.modalObjectId}, tunnelUrls: ${result.tunnelUrls ? Object.keys(result.tunnelUrls).length + ' ports' : 'none'}`);
+        console.log(
+          `[DO] Stored modal_object_id: ${result.modalObjectId}, tunnelUrls: ${result.tunnelUrls ? Object.keys(result.tunnelUrls).length + " ports" : "none"}`
+        );
       }
 
       this.updateSandboxStatus("connecting");

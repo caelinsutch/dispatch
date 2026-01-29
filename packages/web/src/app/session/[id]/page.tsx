@@ -493,11 +493,7 @@ function SessionContent({
                     const parsedOutput = JSON.parse(event.output);
                     const answers = Array.isArray(parsedOutput) ? parsedOutput : [[parsedOutput]];
                     return (
-                      <AnsweredQuestion
-                        key={group.id}
-                        questions={questions}
-                        answers={answers}
-                      />
+                      <AnsweredQuestion key={group.id} questions={questions} answers={answers} />
                     );
                   } catch {
                     // If output isn't JSON, treat as single answer

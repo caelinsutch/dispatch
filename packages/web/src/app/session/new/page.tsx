@@ -1,5 +1,6 @@
 "use client";
 
+import { DEFAULT_MODEL } from "@dispatch/shared";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { SidebarLayout, useSidebarContext } from "@/components/sidebar-layout";
@@ -21,23 +22,7 @@ export default function NewSessionPage() {
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [selectedRepo, setSelectedRepo] = useState<string>("");
-  const [selectedModel, setSelectedModel] = useState<string>(
-    "amazon-bedrock/anthropic.claude-opus-4-5-20251101-v1:0"
-  );
   const [error, setError] = useState("");
-
-  const models = [
-    {
-      id: "amazon-bedrock/anthropic.claude-opus-4-5-20251101-v1:0",
-      name: "Claude Opus 4.5",
-      description: "Most capable",
-    },
-    {
-      id: "amazon-bedrock/anthropic.claude-sonnet-4-5-20250929-v1:0",
-      name: "Claude Sonnet 4.5",
-      description: "Balanced performance",
-    },
-  ];
 
   useEffect(() => {
     if (!isPending && !session) {
@@ -85,7 +70,7 @@ export default function NewSessionPage() {
         body: JSON.stringify({
           repoOwner: owner,
           repoName: name,
-          model: selectedModel,
+          model: DEFAULT_MODEL,
         }),
       });
 
@@ -117,9 +102,6 @@ export default function NewSessionPage() {
         repos={repos}
         selectedRepo={selectedRepo}
         setSelectedRepo={setSelectedRepo}
-        selectedModel={selectedModel}
-        setSelectedModel={setSelectedModel}
-        models={models}
         error={error}
         creating={creating}
         handleSubmit={handleSubmit}
@@ -132,9 +114,6 @@ function NewSessionContent({
   repos,
   selectedRepo,
   setSelectedRepo,
-  selectedModel,
-  setSelectedModel,
-  models,
   error,
   creating,
   handleSubmit,
@@ -142,9 +121,6 @@ function NewSessionContent({
   repos: Repo[];
   selectedRepo: string;
   setSelectedRepo: (value: string) => void;
-  selectedModel: string;
-  setSelectedModel: (value: string) => void;
-  models: { id: string; name: string; description: string }[];
   error: string;
   creating: boolean;
   handleSubmit: (e: React.FormEvent) => void;
@@ -199,25 +175,6 @@ function NewSessionContent({
                   No repositories found. Make sure you have granted access to your repositories.
                 </p>
               )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-2">Model</label>
-              <select
-                value={selectedModel}
-                onChange={(e) => setSelectedModel(e.target.value)}
-                className="w-full px-4 py-3 border border-border bg-input text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-              >
-                {models.map((model) => (
-                  <option key={model.id} value={model.id}>
-                    {model.name} - {model.description}
-                  </option>
-                ))}
-              </select>
-              <p className="mt-2 text-sm text-muted-foreground">
-                Haiku is faster and more affordable. Sonnet provides better reasoning for complex
-                tasks.
-              </p>
             </div>
 
             <button

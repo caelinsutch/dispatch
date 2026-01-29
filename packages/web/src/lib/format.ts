@@ -2,29 +2,8 @@
  * Utility functions for formatting display values
  */
 
-/**
- * Format model ID to display name
- * e.g., "claude-sonnet-4-5" → "Claude Sonnet 4.5"
- * e.g., "claude-haiku-4-5" → "Claude Haiku 4.5"
- * e.g., "claude-opus-4-5" → "Claude Opus 4.5"
- */
-export function formatModelName(modelId: string): string {
-  if (!modelId) return "Unknown Model";
-
-  // Handle common Claude model patterns
-  const match = modelId.match(/^claude-(\w+)-(\d+)-(\d+)$/i);
-  if (match) {
-    const [, variant, major, minor] = match;
-    const capitalizedVariant = variant.charAt(0).toUpperCase() + variant.slice(1).toLowerCase();
-    return `Claude ${capitalizedVariant} ${major}.${minor}`;
-  }
-
-  // Fallback: capitalize words and replace hyphens with spaces
-  return modelId
-    .split("-")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
-}
+// Re-export formatModelName from shared package (single source of truth)
+export { formatModelName } from "@dispatch/shared";
 
 /**
  * Format model ID to lowercase display format for footer

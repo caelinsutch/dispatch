@@ -475,9 +475,9 @@ class AgentBridge:
 
         return None
 
-    # Hardcoded Bedrock model IDs (bypasses model selector until proper config is done)
-    BEDROCK_OPUS_MODEL = "anthropic.claude-opus-4-5-20251101-v1:0"
-    BEDROCK_PROVIDER = "amazon-bedrock"
+    # Default model if none specified
+    DEFAULT_PROVIDER = "amazon-bedrock"
+    DEFAULT_MODEL = "anthropic.claude-opus-4-5-20251101-v1:0"
 
     def _build_prompt_request_body(
         self, content: str, model: str | None, opencode_message_id: str | None = None
@@ -486,7 +486,7 @@ class AgentBridge:
 
         Args:
             content: The prompt text content
-            model: Optional model override (ignored - hardcoded to Bedrock Opus for now)
+            model: Model in format "provider/modelId" (e.g., "amazon-bedrock/anthropic.claude-opus-4-5...")
             opencode_message_id: OpenCode-compatible ascending message ID (e.g., "msg_...").
                                  When provided, OpenCode uses this as the user message ID,
                                  and assistant responses will have parentID pointing to it.
@@ -497,12 +497,17 @@ class AgentBridge:
             request_body["messageID"] = opencode_message_id
             print(f"[bridge] Building prompt request, messageID={opencode_message_id}")
 
-        # HARDCODED: Always use Bedrock Opus regardless of what model was requested
-        # TODO: Remove this hardcoding once model selector uses correct Bedrock model IDs
-        print(f"[bridge] Using hardcoded Bedrock Opus model (requested: {model})")
+        # Parse model format: "provider/modelId" or just "modelId"
+        if model and "/" in model:
+            provider_id, model_id = model.split("/", 1)
+        else:
+            provider_id = self.DEFAULT_PROVIDER
+            model_id = model or self.DEFAULT_MODEL
+
+        print(f"[bridge] Using model: {provider_id}/{model_id}")
         request_body["model"] = {
-            "providerID": self.BEDROCK_PROVIDER,
-            "modelID": self.BEDROCK_OPUS_MODEL,
+            "providerID": provider_id,
+            "modelID": model_id,
         }
 
         return request_body

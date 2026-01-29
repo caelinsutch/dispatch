@@ -2,11 +2,7 @@
  * API router for Modal Sandbox Control Plane.
  */
 
-import type {
-  EnrichedRepository,
-  InstallationRepository,
-  RepoMetadata,
-} from "@dispatch/shared";
+import type { EnrichedRepository, InstallationRepository, RepoMetadata } from "@dispatch/shared";
 import { encryptToken, generateId } from "./auth/crypto";
 import { getGitHubAppConfig, listInstallationRepositories } from "./auth/github-app";
 import { verifyInternalToken } from "./auth/internal";

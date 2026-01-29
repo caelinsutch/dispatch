@@ -261,14 +261,17 @@ class SandboxSupervisor:
         )
 
         # Build OpenCode config from session settings
-        # HARDCODED: Always use Bedrock until model selector is fixed
-        # TODO: Remove hardcoding once web app model selector uses correct Bedrock model IDs
+        provider = self.session_config.get("provider", "amazon-bedrock")
+        model = self.session_config.get("model", "anthropic.claude-opus-4-5-20251101-v1:0")
+        # Default small model for lightweight tasks
+        small_model = "amazon-bedrock/anthropic.claude-3-5-haiku-20241022-v1:0"
+
         opencode_config = {
-            "model": "amazon-bedrock/anthropic.claude-opus-4-5-20251101-v1:0",
-            "small_model": "amazon-bedrock/anthropic.claude-3-5-haiku-20241022-v1:0",
+            "model": f"{provider}/{model}",
+            "small_model": small_model,
             "instructions": [instructions],
         }
-        print(f"[supervisor] Using hardcoded Bedrock models (requested: {self.session_config.get('provider')}/{self.session_config.get('model')})")
+        print(f"[supervisor] Using model: {opencode_config['model']}")
 
         # Determine working directory - use repo path if cloned, otherwise /workspace
         workdir = self.workspace_path
