@@ -26,10 +26,73 @@ cd packages/web && bun test           # Run web tests
 cd packages/web && bun test:watch     # Watch mode
 cd packages/control-plane && bun test # Run control-plane tests
 
-# Deployment
-cd packages/web && bun run build:cloudflare  # Build for Cloudflare (next build + OpenNext)
-modal deploy packages/modal-infra/deploy.py  # Deploy Modal sandboxes
+# Deployment (full steps below)
+bun run build                                 # Build all packages first
+cd packages/control-plane && bunx wrangler deploy  # Deploy control-plane (first!)
+cd packages/web && npx @opennextjs/cloudflare build && bunx wrangler deploy  # Deploy web
+cd packages/slack-bot && bunx wrangler deploy      # Deploy slack-bot
+cd packages/modal-infra && uv run modal deploy deploy.py  # Deploy Modal (use uv!)
 ```
+
+## Deployment Guide
+
+### Prerequisites
+- Bun installed
+- `uv` (Python package manager) installed for Modal
+- Cloudflare account configured with `wrangler`
+- Modal account configured with `modal` CLI
+
+### Deployment Order (important!)
+1. **Control Plane first** - Web and Slack Bot depend on it
+2. **Web**
+3. **Slack Bot**
+4. **Modal Infrastructure**
+
+### Step-by-Step
+
+```bash
+# 1. Install and build
+bun install
+bun run build
+bun run typecheck  # optional but recommended
+
+# 2. Deploy Control Plane
+cd packages/control-plane
+bunx wrangler deploy
+
+# 3. Deploy Web (requires OpenNext build)
+cd packages/web
+npx @opennextjs/cloudflare build
+bunx wrangler deploy
+
+# 4. Deploy Slack Bot
+cd packages/slack-bot
+bunx wrangler deploy
+
+# 5. Deploy Modal (must use uv, not pip)
+cd packages/modal-infra
+uv run modal deploy deploy.py
+```
+
+### Secrets Management
+
+Secrets persist across deployments - only set once per environment.
+
+**Cloudflare Workers** (set via `wrangler secret put <KEY>`):
+- Web: `BETTER_AUTH_SECRET`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`
+- Control Plane: `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `TOKEN_ENCRYPTION_KEY`, `ENCRYPTION_KEY`, `MODAL_API_SECRET`, `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`, `GITHUB_APP_INSTALLATION_ID`
+- Slack Bot: `SLACK_BOT_TOKEN`, `SLACK_SIGNING_SECRET`, `INTERNAL_CALLBACK_SECRET`
+
+**Modal** (set via `modal secret create <name>`):
+- `llm-api-keys`: `ANTHROPIC_API_KEY`
+- `github-app`: `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`, `GITHUB_APP_INSTALLATION_ID`
+- `internal-api`: `MODAL_API_SECRET`, `ALLOWED_CONTROL_PLANE_HOSTS`
+
+### Environment Variables
+
+Non-secret vars are set in `wrangler.jsonc` under `vars`:
+- `packages/web/wrangler.jsonc`: `CONTROL_PLANE_URL`, `NEXT_PUBLIC_WS_URL`
+- `packages/slack-bot/wrangler.jsonc`: `WEB_APP_URL`, `DEFAULT_MODEL`
 
 ## Architecture
 
