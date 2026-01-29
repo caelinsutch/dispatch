@@ -72,8 +72,12 @@ coverage/
 
 # AI Coding Assistants
 .agent/
-.agents/
-.claude/settings.local.json
+.agents/*
+!.agents/skills/
+.claude/*
+!.claude/skills/
+!.claude/commands/
+!.claude/settings.json
 .cline/
 .codebuddy/
 .codex/
@@ -91,7 +95,8 @@ coverage/
 .mcpjam/
 .mux/
 .neovate/
-.opencode/
+.opencode/*
+!.opencode/skills/
 .openhands/
 .pi/
 .pochi/
@@ -101,4 +106,3 @@ coverage/
 .trae/
 .windsurf/
 .zencoder/
-skills/
