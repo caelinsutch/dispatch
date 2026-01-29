@@ -180,6 +180,13 @@ export type SandboxEvent =
       error: string;
       sandboxId?: string;
       timestamp?: number;
+    }
+  | {
+      type: "session_title_updated";
+      title: string;
+      messageId: string;
+      sandboxId?: string;
+      timestamp?: number;
     };
 
 // Attachment

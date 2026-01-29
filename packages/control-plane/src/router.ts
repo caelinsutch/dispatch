@@ -506,6 +506,30 @@ async function handleGetSession(
     return error("Session not found", 404);
   }
 
+  // Lazy sync: Update KV index if session title changed (e.g., from OpenCode auto-title)
+  try {
+    const clonedResponse = response.clone();
+    const sessionData = (await clonedResponse.json()) as { title?: string };
+    const kvData = (await env.SESSION_INDEX.get(`session:${sessionId}`, "json")) as {
+      title?: string;
+    } | null;
+
+    if (kvData && sessionData.title && kvData.title !== sessionData.title) {
+      await env.SESSION_INDEX.put(
+        `session:${sessionId}`,
+        JSON.stringify({
+          ...kvData,
+          title: sessionData.title,
+          updatedAt: Date.now(),
+        })
+      );
+      console.log(`[router] Synced session title: ${sessionData.title}`);
+    }
+  } catch (e) {
+    // Don't fail the request if KV sync fails
+    console.warn(`[router] KV sync failed for session ${sessionId}:`, e);
+  }
+
   return response;
 }
 

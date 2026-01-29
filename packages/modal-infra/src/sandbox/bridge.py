@@ -630,6 +630,21 @@ class AgentBridge:
                         if event_session_id and event_session_id != self.opencode_session_id:
                             continue
 
+                        # Handle session title updates from OpenCode (auto-generated after first message)
+                        if event_type == "session.updated":
+                            info = props.get("info", {})
+                            session_id = info.get("id")
+                            if session_id == self.opencode_session_id:
+                                title = info.get("title", "")
+                                if title:
+                                    print(f"[bridge] Session title updated: {title}")
+                                    yield {
+                                        "type": "session_title_updated",
+                                        "title": title,
+                                        "messageId": message_id,
+                                    }
+                            continue
+
                         if event_type == "message.updated":
                             info = props.get("info", {})
                             msg_session_id = info.get("sessionID")
@@ -1171,6 +1186,21 @@ class AgentBridge:
                             "sessionID"
                         )
                         if event_session_id and event_session_id != self.opencode_session_id:
+                            continue
+
+                        # Handle session title updates from OpenCode
+                        if event_type == "session.updated":
+                            info = props.get("info", {})
+                            session_id = info.get("id")
+                            if session_id == self.opencode_session_id:
+                                title = info.get("title", "")
+                                if title:
+                                    print(f"[bridge] Session title updated (continuation): {title}")
+                                    yield {
+                                        "type": "session_title_updated",
+                                        "title": title,
+                                        "messageId": message_id,
+                                    }
                             continue
 
                         if event_type == "message.updated":

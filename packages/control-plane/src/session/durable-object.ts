@@ -1305,6 +1305,15 @@ export class SessionDO extends DurableObject<Env> {
       this.handlePushEvent(event);
     }
 
+    // Handle session title updates from OpenCode
+    if (event.type === "session_title_updated") {
+      const title = (event as { title?: string }).title;
+      if (title) {
+        console.log(`[DO] Session title updated: ${title}`);
+        this.sql.exec(`UPDATE session SET title = ?, updated_at = ?`, title, now);
+      }
+    }
+
     // Broadcast to clients
     this.broadcast({ type: "sandbox_event", event });
   }
