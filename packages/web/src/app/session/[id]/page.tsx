@@ -252,9 +252,12 @@ export default function SessionPage() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // Check if sandbox is ready to accept messages
+  const sandboxReady = sessionState?.sandboxStatus === "ready" || sessionState?.sandboxStatus === "running";
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!prompt.trim() || isProcessing) return;
+    if (!prompt.trim() || isProcessing || !sandboxReady) return;
 
     sendPrompt(prompt, selectedModel);
     setPrompt("");
@@ -385,6 +388,9 @@ function SessionContent({
 }) {
   const { isOpen, toggle } = useSidebarContext();
 
+  // Check if sandbox is ready to accept messages
+  const sandboxReady = sessionState?.sandboxStatus === "ready" || sessionState?.sandboxStatus === "running";
+
   // Deduplicate and group events for rendering
   const groupedEvents = useMemo(() => {
     const filteredEvents: SandboxEvent[] = [];
@@ -441,8 +447,7 @@ function SessionContent({
             </div>
           </div>
           <div className="flex items-center gap-4">
-            <ConnectionStatus connected={connected} connecting={connecting} />
-            <SandboxStatus status={sessionState?.sandboxStatus} />
+            <SessionStatus connected={connected} connecting={connecting} sandboxStatus={sessionState?.sandboxStatus} />
             <ParticipantsList participants={participants} />
           </div>
         </div>
@@ -564,7 +569,7 @@ function SessionContent({
                 value={prompt}
                 onChange={handleInputChange}
                 onKeyDown={handleKeyDown}
-                placeholder={isProcessing ? "Type your next message..." : "Ask or build anything"}
+                placeholder={!sandboxReady ? "Waiting for sandbox..." : isProcessing ? "Type your next message..." : "Ask or build anything"}
                 className="w-full resize-none bg-transparent px-4 pt-4 pb-12 focus:outline-none text-foreground placeholder:text-secondary-foreground"
                 rows={3}
               />
@@ -587,9 +592,9 @@ function SessionContent({
                 )}
                 <button
                   type="submit"
-                  disabled={!prompt.trim() || isProcessing}
+                  disabled={!prompt.trim() || isProcessing || !sandboxReady}
                   className="p-2 text-secondary-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition"
-                  title={isProcessing && prompt.trim() ? "Wait for execution to complete" : "Send"}
+                  title={!sandboxReady ? "Waiting for sandbox to be ready" : isProcessing && prompt.trim() ? "Wait for execution to complete" : "Send"}
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path
@@ -675,47 +680,53 @@ function SidebarToggleIcon() {
   );
 }
 
-function ConnectionStatus({ connected, connecting }: { connected: boolean; connecting: boolean }) {
+function SessionStatus({
+  connected,
+  connecting,
+  sandboxStatus,
+}: {
+  connected: boolean;
+  connecting: boolean;
+  sandboxStatus?: string;
+}) {
+  // Show connection status if not connected
   if (connecting) {
     return (
-      <span className="flex items-center gap-1 text-xs text-yellow-600 dark:text-yellow-500">
+      <span className="flex items-center gap-1.5 text-xs text-yellow-600 dark:text-yellow-500">
         <span className="w-2 h-2 rounded-full bg-yellow-500 animate-pulse" />
         Connecting...
       </span>
     );
   }
 
-  if (connected) {
+  if (!connected) {
     return (
-      <span className="flex items-center gap-1 text-xs text-success">
-        <span className="w-2 h-2 rounded-full bg-success" />
-        Connected
+      <span className="flex items-center gap-1.5 text-xs text-red-600 dark:text-red-500">
+        <span className="w-2 h-2 rounded-full bg-red-500" />
+        Disconnected
       </span>
     );
   }
 
-  return (
-    <span className="flex items-center gap-1 text-xs text-red-600 dark:text-red-500">
-      <span className="w-2 h-2 rounded-full bg-red-500" />
-      Disconnected
-    </span>
-  );
-}
-
-function SandboxStatus({ status }: { status?: string }) {
-  if (!status) return null;
-
-  const colors: Record<string, string> = {
-    pending: "text-muted-foreground",
-    warming: "text-yellow-600 dark:text-yellow-500",
-    syncing: "text-accent",
-    ready: "text-success",
-    running: "text-accent",
-    stopped: "text-muted-foreground",
-    failed: "text-red-600 dark:text-red-500",
+  // Connected - show sandbox status
+  const statusConfig: Record<string, { color: string; bgColor: string; label: string; pulse?: boolean }> = {
+    pending: { color: "text-muted-foreground", bgColor: "bg-muted-foreground", label: "Starting..." },
+    warming: { color: "text-yellow-600 dark:text-yellow-500", bgColor: "bg-yellow-500", label: "Warming up...", pulse: true },
+    syncing: { color: "text-accent", bgColor: "bg-accent", label: "Syncing...", pulse: true },
+    ready: { color: "text-success", bgColor: "bg-success", label: "Ready" },
+    running: { color: "text-accent", bgColor: "bg-accent", label: "Running", pulse: true },
+    stopped: { color: "text-muted-foreground", bgColor: "bg-muted-foreground", label: "Stopped" },
+    failed: { color: "text-red-600 dark:text-red-500", bgColor: "bg-red-500", label: "Failed" },
   };
 
-  return <span className={`text-xs ${colors[status] || colors.pending}`}>Sandbox: {status}</span>;
+  const config = statusConfig[sandboxStatus || "pending"] || statusConfig.pending;
+
+  return (
+    <span className={`flex items-center gap-1.5 text-xs ${config.color}`}>
+      <span className={`w-2 h-2 rounded-full ${config.bgColor} ${config.pulse ? "animate-pulse" : ""}`} />
+      {config.label}
+    </span>
+  );
 }
 
 function ThinkingIndicator() {
