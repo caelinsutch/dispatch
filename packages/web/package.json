@@ -14,13 +14,17 @@
     "lint:fix": "biome check --write src/",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "db:generate": "drizzle-kit generate --dialect=sqlite --schema=./src/db/schema.ts --out=./migrations",
+    "db:migrate": "wrangler d1 migrations apply dispatch-auth-db --remote",
+    "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
     "@dispatch/shared": "workspace:*",
     "@streamdown/code": "^1.0.1",
     "@tailwindcss/typography": "^0.5.19",
     "better-auth": "^1.2.0",
+    "drizzle-orm": "^0.45.1",
     "next": "^15.1.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
@@ -28,12 +32,14 @@
     "zustand": "^5.0.3"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260129.0",
     "@opennextjs/cloudflare": "^1.16.1",
     "@types/node": "^22.10.5",
     "@types/react": "^19.0.6",
     "@types/react-dom": "^19.0.3",
     "@vitest/coverage-v8": "^4.0.17",
     "autoprefixer": "^10.4.20",
+    "drizzle-kit": "^0.31.8",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.7.2",

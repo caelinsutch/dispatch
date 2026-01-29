@@ -12,6 +12,15 @@
     "directory": ".open-next/assets"
   },
 
+  // D1 Database for Better Auth sessions
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "dispatch-auth-db",
+      "database_id": "de24a99f-f001-428c-bcd7-723a98c60723"
+    }
+  ],
+
   // Environment variables (non-secret)
   "vars": {
     "DEPLOYMENT_NAME": "dispatch"
@@ -19,5 +28,7 @@
 
   // Secrets (set via: wrangler secret put <KEY>)
   // Required secrets:
-  // - TBD based on Next.js app requirements
+  // - BETTER_AUTH_SECRET (or NEXTAUTH_SECRET)
+  // - GITHUB_CLIENT_ID
+  // - GITHUB_CLIENT_SECRET
 }

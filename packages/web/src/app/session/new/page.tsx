@@ -41,7 +41,7 @@ export default function NewSessionPage() {
     try {
       const res = await fetch("/api/repos");
       if (res.ok) {
-        const data = await res.json();
+        const data = (await res.json()) as { repos?: typeof repos };
         setRepos(data.repos || []);
       }
     } catch (error) {
@@ -75,10 +75,10 @@ export default function NewSessionPage() {
       });
 
       if (res.ok) {
-        const data = await res.json();
+        const data = (await res.json()) as { sessionId: string };
         router.push(`/session/${data.sessionId}`);
       } else {
-        const data = await res.json();
+        const data = (await res.json()) as { error?: string };
         setError(data.error || "Failed to create session");
       }
     } catch (_error) {

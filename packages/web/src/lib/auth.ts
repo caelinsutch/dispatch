@@ -1,6 +1,10 @@
 import { betterAuth } from "better-auth";
+import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { drizzle } from "drizzle-orm/d1";
 import { headers } from "next/headers";
+import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { checkAccessAllowed, parseAllowlist } from "./access-control";
+import * as schema from "@/db/schema";
 
 // Type declarations for custom session data
 export interface SessionUser {
@@ -33,54 +37,65 @@ export interface SessionWithToken extends Session {
   accessTokenExpiresAt?: number;
 }
 
-export const auth = betterAuth({
-  baseURL: process.env.BETTER_AUTH_URL || process.env.NEXTAUTH_URL,
-  secret: process.env.BETTER_AUTH_SECRET || process.env.NEXTAUTH_SECRET,
-  socialProviders: {
-    github: {
-      clientId: process.env.GITHUB_CLIENT_ID!,
-      clientSecret: process.env.GITHUB_CLIENT_SECRET!,
-      scope: ["read:user", "user:email", "repo"],
+/**
+ * Create a Better Auth instance with the D1 database.
+ * Must be called within a request context to access Cloudflare bindings.
+ */
+export async function getAuth() {
+  const { env } = await getCloudflareContext({ async: true });
+  const db = drizzle(env.DB, { schema });
+
+  return betterAuth({
+    baseURL: process.env.BETTER_AUTH_URL || process.env.NEXTAUTH_URL,
+    secret: process.env.BETTER_AUTH_SECRET || process.env.NEXTAUTH_SECRET,
+    database: drizzleAdapter(db, {
+      provider: "sqlite",
+    }),
+    socialProviders: {
+      github: {
+        clientId: process.env.GITHUB_CLIENT_ID!,
+        clientSecret: process.env.GITHUB_CLIENT_SECRET!,
+        scope: ["read:user", "user:email", "repo"],
+      },
     },
-  },
-  databaseHooks: {
-    user: {
-      create: {
-        before: async (user, ctx) => {
-          // Access control check during sign-in
-          // Get the OAuth profile data from the context
-          const profile = ctx?.context?.socialProfile as { login?: string } | undefined;
+    databaseHooks: {
+      user: {
+        create: {
+          before: async (user, ctx) => {
+            // Access control check during sign-in
+            const profile = ctx?.context?.socialProfile as { login?: string } | undefined;
 
-          const config = {
-            allowedDomains: parseAllowlist(process.env.ALLOWED_EMAIL_DOMAINS),
-            allowedUsers: parseAllowlist(process.env.ALLOWED_USERS),
-          };
+            const config = {
+              allowedDomains: parseAllowlist(process.env.ALLOWED_EMAIL_DOMAINS),
+              allowedUsers: parseAllowlist(process.env.ALLOWED_USERS),
+            };
 
-          const isAllowed = checkAccessAllowed(config, {
-            githubUsername: profile?.login,
-            email: user.email ?? undefined,
-          });
+            const isAllowed = checkAccessAllowed(config, {
+              githubUsername: profile?.login,
+              email: user.email ?? undefined,
+            });
 
-          if (!isAllowed) {
-            // Returning false/undefined or throwing will prevent user creation
-            throw new Error("Access denied. User not in allowlist.");
-          }
+            if (!isAllowed) {
+              throw new Error("Access denied. User not in allowlist.");
+            }
 
-          return { data: user };
+            return { data: user };
+          },
         },
       },
     },
-  },
-  pages: {
-    error: "/access-denied",
-  },
-});
+    pages: {
+      error: "/access-denied",
+    },
+  });
+}
 
 /**
  * Get the current session on the server side.
  * Use this in API routes and Server Components.
  */
 export async function getServerSession(): Promise<SessionWithToken | null> {
+  const auth = await getAuth();
   const session = await auth.api.getSession({
     headers: await headers(),
   });
@@ -103,7 +118,7 @@ export async function getServerSession(): Promise<SessionWithToken | null> {
     session: session.session,
     user: {
       ...session.user,
-      login: githubAccount?.accountId, // GitHub username is stored as accountId
+      login: githubAccount?.accountId,
     },
   };
 
@@ -119,4 +134,4 @@ export async function getServerSession(): Promise<SessionWithToken | null> {
 }
 
 // Re-export auth type for client usage
-export type Auth = typeof auth;
+export type Auth = Awaited<ReturnType<typeof getAuth>>;
