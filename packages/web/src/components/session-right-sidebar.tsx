@@ -24,6 +24,7 @@ interface SessionState {
   createdAt: number;
   model?: string;
   tunnelUrls?: Record<number, string>;
+  activePorts?: number[];
 }
 
 interface Participant {
@@ -92,12 +93,17 @@ export function SessionRightSidebar({
         />
       </div>
 
-      {/* Live Preview */}
-      {sessionState.tunnelUrls && Object.keys(sessionState.tunnelUrls).length > 0 && (
-        <CollapsibleSection title="Live Preview" defaultOpen={true}>
-          <PreviewSection tunnelUrls={sessionState.tunnelUrls} />
-        </CollapsibleSection>
-      )}
+      {/* Live Preview - only show when ports are detected in output */}
+      {sessionState.tunnelUrls &&
+        sessionState.activePorts &&
+        sessionState.activePorts.length > 0 && (
+          <CollapsibleSection title="Live Preview" defaultOpen={true}>
+            <PreviewSection
+              tunnelUrls={sessionState.tunnelUrls}
+              activePorts={sessionState.activePorts}
+            />
+          </CollapsibleSection>
+        )}
 
       {/* Tasks */}
       {tasks.length > 0 && (

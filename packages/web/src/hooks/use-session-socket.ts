@@ -51,6 +51,7 @@ interface SessionState {
   model?: string;
   isProcessing: boolean;
   tunnelUrls?: Record<number, string>;
+  activePorts?: number[];
 }
 
 interface Participant {
@@ -125,6 +126,7 @@ export function useSessionSocket(sessionId: string): UseSessionSocketReturn {
       participantId?: string;
       participant?: { participantId: string; name: string; avatar?: string };
       isProcessing?: boolean;
+      activePorts?: number[];
     }) => {
       switch (data.type) {
         case "subscribed":
@@ -269,6 +271,12 @@ export function useSessionSocket(sessionId: string): UseSessionSocketReturn {
           if (typeof data.isProcessing === "boolean") {
             const isProcessing = data.isProcessing;
             setSessionState((prev) => (prev ? { ...prev, isProcessing } : null));
+          }
+          break;
+
+        case "active_ports_updated":
+          if (data.activePorts) {
+            setSessionState((prev) => (prev ? { ...prev, activePorts: data.activePorts } : null));
           }
           break;
 

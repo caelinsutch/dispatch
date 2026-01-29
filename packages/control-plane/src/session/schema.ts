@@ -167,4 +167,7 @@ export function initSchema(sql: SqlStorage): void {
 
   // Migration: Add tunnel_urls column for Modal tunnel URLs
   runMigration(sql, `ALTER TABLE sandbox ADD COLUMN tunnel_urls TEXT`);
+
+  // Migration: Add active_ports column for detected localhost ports (JSON array)
+  runMigration(sql, `ALTER TABLE sandbox ADD COLUMN active_ports TEXT`);
 }

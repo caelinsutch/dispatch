@@ -91,6 +91,7 @@ export interface SandboxRow {
   last_heartbeat: number | null;
   last_activity: number | null;
   tunnel_urls: string | null;
+  active_ports: string | null;
   created_at: number;
 }
 

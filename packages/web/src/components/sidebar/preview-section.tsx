@@ -2,10 +2,15 @@
 
 interface PreviewSectionProps {
   tunnelUrls: Record<number, string>;
+  activePorts?: number[];
 }
 
-export function PreviewSection({ tunnelUrls }: PreviewSectionProps) {
-  const entries = Object.entries(tunnelUrls).sort(([a], [b]) => Number(a) - Number(b));
+export function PreviewSection({ tunnelUrls, activePorts }: PreviewSectionProps) {
+  // Filter to only show active ports (detected in output)
+  // If no ports detected yet, show nothing
+  const entries = Object.entries(tunnelUrls)
+    .filter(([port]) => activePorts?.includes(Number(port)))
+    .sort(([a], [b]) => Number(a) - Number(b));
 
   if (entries.length === 0) {
     return null;
@@ -35,7 +40,11 @@ function GlobeIcon({ className }: { className?: string }) {
   return (
     <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <circle cx="12" cy="12" r="10" strokeWidth={2} />
-      <path strokeLinecap="round" strokeWidth={2} d="M2 12h20M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z" />
+      <path
+        strokeLinecap="round"
+        strokeWidth={2}
+        d="M2 12h20M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"
+      />
     </svg>
   );
 }
