@@ -1,7 +1,14 @@
 "use client";
 
+import { DEFAULT_MODEL } from "@dispatch/shared";
 import { createContext, use, useCallback, useEffect, useRef, useState } from "react";
 import type { SessionItem } from "@/components/session-sidebar";
+
+interface CreateSessionResult {
+  success: boolean;
+  sessionId?: string;
+  error?: string;
+}
 
 interface SessionsContextValue {
   sessions: SessionItem[];
@@ -9,6 +16,7 @@ interface SessionsContextValue {
   error: string | null;
   refresh: () => Promise<void>;
   updateSession: (id: string, updates: Partial<SessionItem>) => void;
+  createSession: (repoOwner: string, repoName: string) => Promise<CreateSessionResult>;
   archiveSession: (id: string) => Promise<boolean>;
   unarchiveSession: (id: string) => Promise<boolean>;
   deleteSession: (id: string) => Promise<boolean>;
@@ -115,6 +123,44 @@ export function SessionsProvider({ children, isAuthenticated }: SessionsProvider
     }
   }, []);
 
+  const createSession = useCallback(
+    async (repoOwner: string, repoName: string): Promise<CreateSessionResult> => {
+      try {
+        const res = await fetch("/api/sessions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            repoOwner,
+            repoName,
+            model: DEFAULT_MODEL,
+          }),
+        });
+
+        if (res.ok) {
+          const data = (await res.json()) as { sessionId: string };
+          // Add the new session to local state
+          const newSession: SessionItem = {
+            id: data.sessionId,
+            title: null,
+            repoOwner,
+            repoName,
+            status: "active",
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+          };
+          setSessions((prev) => [newSession, ...prev]);
+          return { success: true, sessionId: data.sessionId };
+        }
+        const errorData = (await res.json()) as { error?: string };
+        return { success: false, error: errorData.error || "Failed to create session" };
+      } catch (err) {
+        console.error("Failed to create session:", err);
+        return { success: false, error: "Failed to create session" };
+      }
+    },
+    []
+  );
+
   return (
     <SessionsContext
       value={{
@@ -123,6 +169,7 @@ export function SessionsProvider({ children, isAuthenticated }: SessionsProvider
         error,
         refresh,
         updateSession,
+        createSession,
         archiveSession,
         unarchiveSession,
         deleteSession,

@@ -9,13 +9,13 @@ Dispatch is a multiplayer code execution platform for collaborative AI coding se
 ## Commands
 
 ```bash
-# Development
+# Development (uses Turborepo for parallel execution)
 bun install               # Install dependencies (uses Bun workspaces)
-bun run dev               # Start all packages in dev mode
+bun run dev               # Start all packages in dev mode (turbo dev)
 
-# Build and check
-bun run build             # Build all packages
-bun run typecheck         # Type check all packages
+# Build and check (uses Turborepo)
+bun run build             # Build all packages (turbo build)
+bun run typecheck         # Type check all packages (turbo typecheck)
 
 # Linting (Biome, NOT ESLint)
 bun run lint              # Check with Biome

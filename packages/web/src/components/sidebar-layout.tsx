@@ -1,7 +1,6 @@
 "use client";
 
 import { Github } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { createContext, use, useCallback, useState } from "react";
 import { SessionsProvider } from "@/hooks/use-sessions";
 import { useSidebar } from "@/hooks/use-sidebar";
@@ -50,7 +49,6 @@ interface SidebarLayoutProps {
 
 export function SidebarLayout({ children }: SidebarLayoutProps) {
   const { data: session, isPending } = authClient.useSession();
-  const router = useRouter();
   const sidebar = useSidebar();
   const [rightPanelContent, setRightPanelContent] = useState<React.ReactNode | null>(null);
 
@@ -83,10 +81,6 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
     );
   }
 
-  const handleNewSession = () => {
-    router.push("/session/new");
-  };
-
   return (
     <SidebarContext.Provider value={sidebar}>
       <RightPanelContext.Provider
@@ -97,7 +91,7 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
             <ResizablePanelGroup orientation="horizontal" id="sidebar-layout">
               {/* Left Sidebar - Workspaces */}
               <ResizablePanel id="sidebar" defaultSize={20} minSize="240px" maxSize="400px">
-                <SessionSidebar onNewSession={handleNewSession} onToggle={sidebar.toggle} />
+                <SessionSidebar onToggle={sidebar.toggle} />
               </ResizablePanel>
 
               <ResizableHandle />

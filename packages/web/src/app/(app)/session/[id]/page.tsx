@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, LogOut, PanelLeft } from "lucide-react";
+import { Check, PanelLeft } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActionBar } from "@/components/action-bar";
@@ -14,14 +14,6 @@ import { SessionRightSidebar } from "@/components/session-right-sidebar";
 import { useRightPanelContext, useSidebarContext } from "@/components/sidebar-layout";
 import { ToolCallGroup } from "@/components/tool-call-group";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { HeaderSkeleton, MessageListSkeleton } from "@/components/ui/skeleton";
 import { SessionContext, useSessionSocket } from "@/hooks/use-session-socket";
 import { useSessionsContext } from "@/hooks/use-sessions";
@@ -472,8 +464,7 @@ function SessionContent() {
       {!sessionState ? (
         <HeaderSkeleton />
       ) : (
-        <header className="border-b border-border-muted flex-shrink-0">
-          <div className="px-4 py-3 flex items-center justify-between">
+        <header className="h-12 px-4 flex items-center justify-between border-b border-border-muted flex-shrink-0">
             <div className="flex items-center gap-3">
               {!isOpen && (
                 <button
@@ -485,23 +476,16 @@ function SessionContent() {
                 </button>
               )}
               <div>
-                <h1 className="font-medium text-foreground">
+                <h1 className="text-sm font-medium text-foreground">
                   {sessionState.title || `${sessionState.repoOwner}/${sessionState.repoName}`}
                 </h1>
-                <p className="text-sm text-muted-foreground">
-                  {sessionState.repoOwner}/{sessionState.repoName}
-                </p>
               </div>
             </div>
-            <div className="flex items-center gap-4">
-              <SessionStatus
-                connected={connected}
-                connecting={connecting}
-                sandboxStatus={sessionState.sandboxStatus}
-              />
-              <UserMenu />
-            </div>
-          </div>
+            <SessionStatus
+              connected={connected}
+              connecting={connecting}
+              sandboxStatus={sessionState.sandboxStatus}
+            />
         </header>
       )}
 
@@ -537,6 +521,14 @@ function SessionContent() {
               // Render message chain
               const { chain } = item;
 
+              // Calculate chain timing
+              const chainStartTime =
+                chain.events.length > 0 ? chain.events[0].timestamp : undefined;
+              const chainEndTime =
+                chain.events.length > 0
+                  ? chain.events[chain.events.length - 1].timestamp
+                  : undefined;
+
               // Find the last token group (final message to always show)
               let lastTokenGroupIndex = -1;
               for (let i = chain.groups.length - 1; i >= 0; i--) {
@@ -557,9 +549,7 @@ function SessionContent() {
 
               const renderGroup = (group: (typeof chain.groups)[0]) => {
                 if (group.type === "tool_group") {
-                  return (
-                    <ToolCallGroup key={group.id} events={group.events} groupId={group.id} />
-                  );
+                  return <ToolCallGroup key={group.id} events={group.events} groupId={group.id} />;
                 }
                 if (group.type === "question") {
                   const event = group.event;
@@ -582,6 +572,9 @@ function SessionContent() {
                     key={group.id}
                     event={group.event}
                     currentParticipantId={currentParticipantId}
+                    chainStartTime={chainStartTime}
+                    chainEndTime={chainEndTime}
+                    chainIsComplete={chain.isComplete}
                   />
                 );
               };
@@ -763,87 +756,12 @@ function ThinkingIndicator() {
   );
 }
 
-function ParticipantsList({
-  participants,
-}: {
-  participants: { userId: string; name: string; status: string; avatar?: string }[];
-}) {
-  if (participants.length === 0) return null;
-
-  // Deduplicate participants by userId (same user may have multiple connections)
-  const uniqueParticipants = Array.from(new Map(participants.map((p) => [p.userId, p])).values());
-
-  return (
-    <div className="flex -space-x-2">
-      {uniqueParticipants.slice(0, 3).map((p) => (
-        <Avatar key={`header-${p.userId}`} className="w-8 h-8 border-2 border-background">
-          {p.avatar && <AvatarImage src={p.avatar} alt={p.name} />}
-          <AvatarFallback className="text-xs">{p.name.charAt(0).toUpperCase()}</AvatarFallback>
-        </Avatar>
-      ))}
-      {uniqueParticipants.length > 3 && (
-        <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-medium text-foreground border-2 border-background">
-          +{uniqueParticipants.length - 3}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function UserMenu() {
-  const { data: session } = authClient.useSession();
-  const router = useRouter();
-
-  const handleSignOut = async () => {
-    await authClient.signOut();
-    router.push("/");
-  };
-
-  if (!session?.user) return null;
-
-  const user = session.user;
-  const initials = user.name
-    ? user.name
-        .split(" ")
-        .map((n) => n[0])
-        .join("")
-        .toUpperCase()
-        .slice(0, 2)
-    : user.email?.[0].toUpperCase() || "?";
-
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button className="focus:outline-none" title={user.name || user.email || "User menu"}>
-          <Avatar className="w-8 h-8 cursor-pointer hover:opacity-80 transition">
-            {user.image && <AvatarImage src={user.image} alt={user.name || "Profile"} />}
-            <AvatarFallback className="text-xs">{initials}</AvatarFallback>
-          </Avatar>
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56">
-        <DropdownMenuLabel className="font-normal">
-          <div className="flex flex-col space-y-1">
-            {user.name && <p className="text-sm font-medium">{user.name}</p>}
-            {user.email && <p className="text-xs text-muted-foreground truncate">{user.email}</p>}
-          </div>
-        </DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem
-          onClick={handleSignOut}
-          className="cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-900/20"
-        >
-          <LogOut className="mr-2 h-4 w-4" />
-          Sign out
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
-
 function EventItem({
   event,
   currentParticipantId,
+  chainStartTime,
+  chainEndTime,
+  chainIsComplete,
 }: {
   event: {
     type: string;
@@ -861,6 +779,9 @@ function EventItem({
     };
   };
   currentParticipantId: string | null;
+  chainStartTime?: number;
+  chainEndTime?: number;
+  chainIsComplete?: boolean;
 }) {
   const time = new Date(event.timestamp * 1000).toLocaleTimeString();
 
@@ -888,6 +809,12 @@ function EventItem({
         navigator.clipboard.writeText(event.content || "");
       };
 
+      // Calculate execution time if chain is complete
+      const executionTime =
+        chainIsComplete && chainStartTime && chainEndTime
+          ? chainEndTime - chainStartTime
+          : undefined;
+
       return (
         <div className="flex justify-start relative">
           <div className="flex flex-col w-full max-w-xl lg:max-w-3xl space-y-1 break-words">
@@ -897,7 +824,13 @@ function EventItem({
                 className="prose prose-sm dark:prose-invert antialiased select-text text-pretty"
               />
             </div>
-            <MessageFooter onCopy={handleCopy} showUndo={false} />
+            <MessageFooter
+              onCopy={handleCopy}
+              showUndo={false}
+              startTime={chainStartTime}
+              isLive={!chainIsComplete}
+              executionTime={executionTime}
+            />
           </div>
         </div>
       );

@@ -6,6 +6,7 @@ import {
   ChevronDown,
   GitBranch,
   HelpCircle,
+  Loader2,
   MoreHorizontal,
   Plus,
   Settings,
@@ -15,6 +16,7 @@ import {
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { AddRepositoryModal } from "@/components/add-repository-modal";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -42,13 +44,28 @@ export interface SessionItem {
 }
 
 interface SessionSidebarProps {
-  onNewSession?: () => void;
   onToggle?: () => void;
 }
 
-export function SessionSidebar({ onNewSession }: SessionSidebarProps) {
-  const { sessions, isLoading: initialLoading } = useSessionsContext();
+export function SessionSidebar(_props: SessionSidebarProps) {
+  const { sessions, isLoading: initialLoading, createSession } = useSessionsContext();
   const pathname = usePathname();
+  const router = useRouter();
+  const [addRepoModalOpen, setAddRepoModalOpen] = useState(false);
+  const [creatingForRepo, setCreatingForRepo] = useState<string | null>(null);
+
+  const handleCreateSessionForRepo = async (repoOwner: string, repoName: string) => {
+    const repoKey = `${repoOwner}/${repoName}`;
+    setCreatingForRepo(repoKey);
+
+    const result = await createSession(repoOwner, repoName);
+
+    if (result.success && result.sessionId) {
+      router.push(`/session/${result.sessionId}`);
+    }
+
+    setCreatingForRepo(null);
+  };
 
   // Separate active and archived sessions
   const { activeSessions, archivedSessions } = useMemo(() => {
@@ -101,7 +118,7 @@ export function SessionSidebar({ onNewSession }: SessionSidebarProps) {
   return (
     <aside className="h-full flex flex-col bg-background overflow-hidden">
       {/* Header */}
-      <div className="flex items-center gap-2 px-4 py-3 border-b border-border-muted">
+      <div className="h-12 flex items-center gap-2 px-4 border-b border-border-muted">
         <svg
           className="size-4 text-muted-foreground"
           viewBox="0 0 24 24"
@@ -125,15 +142,19 @@ export function SessionSidebar({ onNewSession }: SessionSidebarProps) {
           </div>
         ) : (
           <div>
-            {groupedSessions.map(([repoKey, repoSessions]) => (
-              <RepoGroup
-                key={repoKey}
-                repoKey={repoKey}
-                sessions={repoSessions}
-                currentSessionId={currentSessionId}
-                onNewSession={onNewSession}
-              />
-            ))}
+            {groupedSessions.map(([repoKey, repoSessions]) => {
+              const [owner, name] = repoKey.split("/");
+              return (
+                <RepoGroup
+                  key={repoKey}
+                  repoKey={repoKey}
+                  sessions={repoSessions}
+                  currentSessionId={currentSessionId}
+                  onCreateSession={() => handleCreateSessionForRepo(owner, name)}
+                  isCreating={creatingForRepo === repoKey}
+                />
+              );
+            })}
 
             {/* Archived Sessions Section */}
             {archivedSessions.length > 0 && (
@@ -173,7 +194,7 @@ export function SessionSidebar({ onNewSession }: SessionSidebarProps) {
       <div className="border-t border-border-muted px-4 py-3 flex items-center justify-between">
         <button
           type="button"
-          onClick={onNewSession}
+          onClick={() => setAddRepoModalOpen(true)}
           className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
           <SquarePlus className="size-4" />
@@ -188,6 +209,8 @@ export function SessionSidebar({ onNewSession }: SessionSidebarProps) {
           </IconButton>
         </div>
       </div>
+
+      <AddRepositoryModal open={addRepoModalOpen} onOpenChange={setAddRepoModalOpen} />
     </aside>
   );
 }
@@ -196,12 +219,14 @@ function RepoGroup({
   repoKey,
   sessions,
   currentSessionId,
-  onNewSession,
+  onCreateSession,
+  isCreating,
 }: {
   repoKey: string;
   sessions: SessionItem[];
   currentSessionId: string | null;
-  onNewSession?: () => void;
+  onCreateSession: () => void;
+  isCreating: boolean;
 }) {
   const [isExpanded, setIsExpanded] = useState(true);
   const hasActiveSession = sessions.some((s) => s.id === currentSessionId);
@@ -239,8 +264,12 @@ function RepoGroup({
           <IconButton size="sm" title="More options">
             <MoreHorizontal className="size-3.5" />
           </IconButton>
-          <IconButton size="sm" title="New session" onClick={onNewSession}>
-            <Plus className="size-3.5" />
+          <IconButton size="sm" title="New session" onClick={onCreateSession} disabled={isCreating}>
+            {isCreating ? (
+              <Loader2 className="size-3.5 animate-spin" />
+            ) : (
+              <Plus className="size-3.5" />
+            )}
           </IconButton>
         </div>
       </div>

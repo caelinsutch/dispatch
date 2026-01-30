@@ -13,6 +13,7 @@ import {
 } from "./sidebar";
 import { Panel, PanelContent, PanelHeader, PanelTitle } from "./ui/panel";
 import { RightSidebarSkeleton } from "./ui/skeleton";
+import { UserMenu } from "./user-menu";
 
 interface SessionState {
   id: string;
@@ -68,15 +69,11 @@ export function SessionRightSidebar({
 
   return (
     <aside className="h-full overflow-y-auto">
-      {/* Participants */}
-      <Panel variant="ghost" padding="md" className="border-b border-border-muted rounded-none">
-        <PanelHeader>
-          <PanelTitle>Participants</PanelTitle>
-        </PanelHeader>
-        <PanelContent>
-          <ParticipantsSection participants={participants} />
-        </PanelContent>
-      </Panel>
+      {/* Participants and User */}
+      <div className="h-12 flex items-center justify-between px-4 border-b border-border-muted">
+        <ParticipantsSection participants={participants} />
+        <UserMenu />
+      </div>
 
       {/* Metadata */}
       <Panel variant="ghost" padding="md" className="border-b border-border-muted rounded-none">

@@ -1,6 +1,7 @@
 "use client";
 
 import { Copy, FileCode, Split, Undo2 } from "lucide-react";
+import { useEffect, useState } from "react";
 
 export interface FileChange {
   filename: string;
@@ -9,7 +10,9 @@ export interface FileChange {
 }
 
 interface MessageFooterProps {
-  executionTime?: number; // in seconds
+  executionTime?: number; // in seconds (static, for completed messages)
+  startTime?: number; // Unix timestamp in seconds (for live timer)
+  isLive?: boolean; // Whether to show live ticking timer
   onCopy?: () => void;
   onSplit?: () => void;
   onUndo?: () => void;
@@ -19,11 +22,29 @@ interface MessageFooterProps {
 
 function formatTime(seconds: number): string {
   if (seconds < 60) {
-    return `${Math.round(seconds)}s`;
+    return `${seconds.toFixed(1)}s`;
   }
   const minutes = Math.floor(seconds / 60);
-  const remainingSeconds = Math.round(seconds % 60);
+  const remainingSeconds = (seconds % 60).toFixed(1);
   return `${minutes}m, ${remainingSeconds}s`;
+}
+
+function LiveTimer({ startTime }: { startTime: number }) {
+  const [elapsed, setElapsed] = useState(() => {
+    const now = Date.now() / 1000;
+    return Math.max(0, now - startTime);
+  });
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = Date.now() / 1000;
+      setElapsed(Math.max(0, now - startTime));
+    }, 100);
+
+    return () => clearInterval(interval);
+  }, [startTime]);
+
+  return <span>{formatTime(elapsed)}</span>;
 }
 
 // React icon SVG
@@ -54,17 +75,23 @@ function getFileIcon(filename: string) {
 
 export function MessageFooter({
   executionTime,
+  startTime,
+  isLive = false,
   onCopy,
   onSplit,
   onUndo,
   fileChanges = [],
   showUndo = true,
 }: MessageFooterProps) {
+  const showTimer = isLive && startTime !== undefined;
+  const showStaticTime = !isLive && executionTime !== undefined;
+
   return (
     <div className="flex flex-wrap items-center gap-2 mt-2 text-xs text-muted-foreground">
-      {executionTime !== undefined && <span>{formatTime(executionTime)}</span>}
+      {showTimer && <LiveTimer startTime={startTime} />}
+      {showStaticTime && <span>{formatTime(executionTime)}</span>}
 
-      {executionTime !== undefined && <span>·</span>}
+      {(showTimer || showStaticTime) && onCopy && <span>·</span>}
 
       {onCopy && (
         <button
