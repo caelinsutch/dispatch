@@ -557,9 +557,7 @@ function SessionContent() {
 
               const renderGroup = (group: (typeof chain.groups)[0]) => {
                 if (group.type === "tool_group") {
-                  return (
-                    <ToolCallGroup key={group.id} events={group.events} groupId={group.id} />
-                  );
+                  return <ToolCallGroup key={group.id} events={group.events} groupId={group.id} />;
                 }
                 if (group.type === "question") {
                   const event = group.event;

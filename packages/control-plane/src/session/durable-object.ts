@@ -1394,11 +1394,7 @@ export class SessionDO extends DurableObject<Env> {
     if (event.type === "tool_call" && event.callId) {
       // Explicit allowlist of question tool names (case-insensitive)
       const toolName = event.tool?.toLowerCase() || "";
-      const questionTools = [
-        "question",
-        "askuserquestion",
-        "mcp__conductor__askuserquestion",
-      ];
+      const questionTools = ["question", "askuserquestion", "mcp__conductor__askuserquestion"];
       if (questionTools.includes(toolName)) {
         console.log(`[DO] Question tool invoked, tracking pending question: ${event.callId}`);
         this.pendingQuestionRequestIds.add(event.callId);
