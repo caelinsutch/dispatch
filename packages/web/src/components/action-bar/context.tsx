@@ -7,6 +7,7 @@ export interface ActionBarContextValue {
   sessionId: string;
   isArchived: boolean;
   artifacts: Artifact[];
+  tunnelUrls?: Record<number, string>;
 }
 
 export const ActionBarContext = createContext<ActionBarContextValue | null>(null);

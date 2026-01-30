@@ -1,6 +1,6 @@
 "use client";
 
-import { Archive, Github, GitPullRequest, Globe, Link, MoreVertical } from "lucide-react";
+import { Archive, Code, Github, GitPullRequest, Globe, Link, MoreVertical } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,12 +17,19 @@ interface ActionBarRootProps {
   sessionId: string;
   isArchived: boolean;
   artifacts: Artifact[];
+  tunnelUrls?: Record<number, string>;
   children: React.ReactNode;
 }
 
-function ActionBarRoot({ sessionId, isArchived, artifacts, children }: ActionBarRootProps) {
+function ActionBarRoot({
+  sessionId,
+  isArchived,
+  artifacts,
+  tunnelUrls,
+  children,
+}: ActionBarRootProps) {
   return (
-    <ActionBarContext value={{ sessionId, isArchived, artifacts }}>
+    <ActionBarContext value={{ sessionId, isArchived, artifacts, tunnelUrls }}>
       <div className="flex items-center gap-2">{children}</div>
     </ActionBarContext>
   );
@@ -60,6 +67,23 @@ function PrLink() {
       <a href={prArtifact.url} target="_blank" rel="noopener noreferrer">
         <GitPullRequest className="h-4 w-4" />
         <span>View PR</span>
+      </a>
+    </Button>
+  );
+}
+
+// Code-server link component (VS Code in browser)
+function CodeServerLink() {
+  const { tunnelUrls } = useActionBar();
+  const codeServerUrl = tunnelUrls?.[8443];
+
+  if (!codeServerUrl) return null;
+
+  return (
+    <Button variant="outline" size="sm" asChild>
+      <a href={codeServerUrl} target="_blank" rel="noopener noreferrer">
+        <Code className="h-4 w-4" />
+        <span>Edit code</span>
       </a>
     </Button>
   );
@@ -136,6 +160,7 @@ export const ActionBar = {
   Root: ActionBarRoot,
   PreviewLink,
   PrLink,
+  CodeServerLink,
   ArchiveToggle,
   Menu,
 };
