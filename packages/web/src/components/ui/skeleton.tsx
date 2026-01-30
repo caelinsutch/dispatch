@@ -74,13 +74,15 @@ export function RightSidebarSkeleton() {
   return (
     <aside className="w-80 border-l border-border-muted overflow-y-auto hidden lg:block">
       {/* Participants skeleton */}
-      <div className="px-4 py-4 border-b border-border-muted">
-        <Skeleton className="h-4 w-24 mb-3" />
-        <div className="flex -space-x-2">
-          <Skeleton className="h-8 w-8 rounded-full" />
-          <Skeleton className="h-8 w-8 rounded-full" />
-          <Skeleton className="h-8 w-8 rounded-full" />
+      <div className="h-12 flex items-center justify-between px-4 border-b border-border-muted">
+        <div className="flex items-center gap-2">
+          <div className="flex -space-x-2">
+            <Skeleton className="h-6 w-6 rounded-full" />
+            <Skeleton className="h-6 w-6 rounded-full" />
+          </div>
+          <Skeleton className="h-4 w-24" />
         </div>
+        <Skeleton className="h-8 w-8 rounded-full" />
       </div>
 
       {/* Metadata skeleton */}
@@ -125,19 +127,11 @@ export function RightSidebarSkeleton() {
 
 export function HeaderSkeleton() {
   return (
-    <header className="border-b border-border-muted flex-shrink-0">
-      <div className="px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Skeleton className="h-6 w-6 rounded" />
-          <div>
-            <Skeleton className="h-5 w-48 mb-1" />
-            <Skeleton className="h-4 w-32" />
-          </div>
-        </div>
-        <div className="flex items-center gap-4">
-          <Skeleton className="h-4 w-20" />
-        </div>
+    <header className="h-12 px-4 flex items-center justify-between border-b border-border-muted flex-shrink-0">
+      <div className="flex items-center gap-3">
+        <Skeleton className="h-5 w-48" />
       </div>
+      <Skeleton className="h-4 w-16" />
     </header>
   );
 }
