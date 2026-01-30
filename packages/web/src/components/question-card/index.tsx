@@ -1,7 +1,7 @@
 "use client";
 
-import { Check, X } from "lucide-react";
-import { memo } from "react";
+import { Check, MessageSquareMore, Minus, X } from "lucide-react";
+import { memo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -187,42 +187,56 @@ interface AnsweredQuestionProps {
 }
 
 function AnsweredQuestion({ questions, answers }: AnsweredQuestionProps) {
-  return (
-    <div className="bg-card border border-success/50 rounded-lg overflow-hidden my-2">
-      <div className="bg-success/20 px-4 py-2 flex items-center gap-2 border-b border-success/30">
-        <span className="w-5 h-5 bg-success text-white rounded-full flex items-center justify-center text-xs font-bold">
-          <Check className="h-3 w-3" />
-        </span>
-        <span className="font-medium text-success text-sm">Question Answered</span>
-      </div>
+  const [isExpanded, setIsExpanded] = useState(true);
 
-      <div className="p-3">
-        {questions.map((q, qIndex) => (
-          <div key={`answered-${q.header || qIndex}`} className="mb-2 last:mb-0">
-            {q.header && (
-              <div className="text-xs uppercase tracking-wide text-secondary-foreground mb-0.5">
-                {q.header}
-              </div>
-            )}
-            <div className="text-muted-foreground text-sm mb-1">{q.question}</div>
-            <div className="flex flex-wrap gap-1.5">
-              {answers[qIndex]?.length > 0 ? (
-                answers[qIndex].map((answer) => (
-                  <span
-                    key={answer}
-                    className="px-2 py-1 bg-success/20 text-success rounded text-xs font-medium"
-                  >
-                    {answer}
-                  </span>
-                ))
-              ) : (
-                <span className="px-2 py-1 bg-muted text-muted-foreground rounded text-xs">
-                  No selection
-                </span>
+  // Combine all answers for display
+  const allAnswers = answers.flat().filter(Boolean);
+
+  return (
+    <div className="flex flex-col w-full max-w-xl lg:max-w-3xl space-y-1 break-words">
+      <div className="w-full">
+        {/* Collapsible header */}
+        <button
+          type="button"
+          onClick={() => setIsExpanded(!isExpanded)}
+          className="inline-flex items-center gap-2 py-1 group/collapsible max-w-full hover:bg-muted/50 cursor-pointer"
+        >
+          <div className="flex-shrink-0">
+            <Minus className="size-3 text-muted-foreground hidden group-hover/collapsible:block" />
+            <div className="group-hover/collapsible:hidden">
+              <MessageSquareMore className="text-muted-foreground size-3" />
+            </div>
+          </div>
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <div className="text-sm truncate">
+              <span>User input</span>
+            </div>
+          </div>
+        </button>
+
+        {/* Expanded content */}
+        {isExpanded && (
+          <div className="mt-2 font-mono text-xs whitespace-pre-wrap break-words text-foreground bg-muted p-3 rounded-md border border-border">
+            <div className="space-y-3 text-xs">
+              {questions.map((q, qIndex) => (
+                <div key={`answered-${q.header || qIndex}`}>
+                  {/* Question as muted quote */}
+                  <div className="border-l-2 border-muted-foreground/30 pl-2 text-muted-foreground">
+                    {q.question}
+                  </div>
+                  {/* Answer */}
+                  {answers[qIndex]?.length > 0 && (
+                    <div className="font-medium mt-1">{answers[qIndex].join(", ")}</div>
+                  )}
+                </div>
+              ))}
+              {/* If only one question, show answers directly */}
+              {questions.length === 1 && allAnswers.length > 0 && !answers[0]?.length && (
+                <div className="font-medium">{allAnswers.join(", ")}</div>
               )}
             </div>
           </div>
-        ))}
+        )}
       </div>
     </div>
   );

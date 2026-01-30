@@ -2,11 +2,13 @@
 
 import { Github } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { createContext, use } from "react";
+import { createContext, use, useCallback, useState } from "react";
+import { SessionsProvider } from "@/hooks/use-sessions";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { authClient } from "@/lib/auth-client";
 import { SessionSidebar } from "./session-sidebar";
 import { Button } from "./ui/button";
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "./ui/resizable";
 import { Spinner } from "./ui/spinner";
 
 interface SidebarContextValue {
@@ -26,6 +28,22 @@ export function useSidebarContext() {
   return context;
 }
 
+// Context for right panel content
+interface RightPanelContextValue {
+  rightPanelContent: React.ReactNode | null;
+  setRightPanelContent: (content: React.ReactNode | null) => void;
+}
+
+const RightPanelContext = createContext<RightPanelContextValue | null>(null);
+
+export function useRightPanelContext() {
+  const context = use(RightPanelContext);
+  if (!context) {
+    throw new Error("useRightPanelContext must be used within a SidebarLayout");
+  }
+  return context;
+}
+
 interface SidebarLayoutProps {
   children: React.ReactNode;
 }
@@ -34,6 +52,11 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
   const { data: session, isPending } = authClient.useSession();
   const router = useRouter();
   const sidebar = useSidebar();
+  const [rightPanelContent, setRightPanelContent] = useState<React.ReactNode | null>(null);
+
+  const setRightPanel = useCallback((content: React.ReactNode | null) => {
+    setRightPanelContent(content);
+  }, []);
 
   // Show loading state
   if (isPending) {
@@ -66,17 +89,37 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
 
   return (
     <SidebarContext.Provider value={sidebar}>
-      <div className="flex h-screen overflow-hidden">
-        {/* Sidebar with transition */}
-        <div
-          className={`transition-all duration-200 ease-in-out ${
-            sidebar.isOpen ? "w-72" : "w-0"
-          } flex-shrink-0 overflow-hidden`}
-        >
-          <SessionSidebar onNewSession={handleNewSession} onToggle={sidebar.toggle} />
-        </div>
-        <main className="flex-1 overflow-hidden">{children}</main>
-      </div>
+      <RightPanelContext.Provider
+        value={{ rightPanelContent, setRightPanelContent: setRightPanel }}
+      >
+        <SessionsProvider isAuthenticated={!!session}>
+          <div className="h-screen overflow-hidden">
+            <ResizablePanelGroup orientation="horizontal" id="sidebar-layout">
+              {/* Left Sidebar - Workspaces */}
+              <ResizablePanel id="sidebar" defaultSize={20} minSize="240px" maxSize="400px">
+                <SessionSidebar onNewSession={handleNewSession} onToggle={sidebar.toggle} />
+              </ResizablePanel>
+
+              <ResizableHandle />
+
+              {/* Center - Main Content (Messages/Chat) */}
+              <ResizablePanel id="main" defaultSize={rightPanelContent ? 50 : 80} minSize="400px">
+                <main className="h-full overflow-hidden">{children}</main>
+              </ResizablePanel>
+
+              {/* Right Panel - Actions/Changes/Files/Terminal */}
+              {rightPanelContent && (
+                <>
+                  <ResizableHandle />
+                  <ResizablePanel id="right-panel" defaultSize={30} minSize="280px" maxSize="500px">
+                    {rightPanelContent}
+                  </ResizablePanel>
+                </>
+              )}
+            </ResizablePanelGroup>
+          </div>
+        </SessionsProvider>
+      </RightPanelContext.Provider>
     </SidebarContext.Provider>
   );
 }

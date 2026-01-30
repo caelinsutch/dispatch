@@ -13,10 +13,24 @@ export interface SandboxEvent {
   output?: string;
   sha?: string;
   timestamp: number;
+  metadata?: {
+    summary?: ToolCallSummary[];
+    sessionId?: string;
+    [key: string]: unknown;
+  };
   author?: {
     participantId: string;
     name: string;
     avatar?: string;
+  };
+}
+
+export interface ToolCallSummary {
+  id: string;
+  tool: string;
+  state: {
+    status: string;
+    title?: string;
   };
 }
 

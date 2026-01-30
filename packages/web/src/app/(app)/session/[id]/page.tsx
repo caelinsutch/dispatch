@@ -1,14 +1,17 @@
 "use client";
 
-import { ArrowUp, Check, Layers, LogOut, PanelLeft, Square } from "lucide-react";
+import { Check, LogOut, PanelLeft } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActionBar } from "@/components/action-bar";
+import { Composer, type PendingQuestion } from "@/components/composer";
+import { MessageChain } from "@/components/message-chain";
+import { MessageFooter } from "@/components/message-footer";
 import type { QuestionInfo } from "@/components/question-card";
-import { AnsweredQuestion, QuestionCard } from "@/components/question-card";
+import { AnsweredQuestion } from "@/components/question-card";
 import { SafeMarkdown } from "@/components/safe-markdown";
 import { SessionRightSidebar } from "@/components/session-right-sidebar";
-import { SidebarLayout, useSidebarContext } from "@/components/sidebar-layout";
+import { useRightPanelContext, useSidebarContext } from "@/components/sidebar-layout";
 import { ToolCallGroup } from "@/components/tool-call-group";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -21,8 +24,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { HeaderSkeleton, MessageListSkeleton } from "@/components/ui/skeleton";
 import { SessionContext, useSessionSocket } from "@/hooks/use-session-socket";
+import { useSessionsContext } from "@/hooks/use-sessions";
 import { authClient } from "@/lib/auth-client";
-import { formatModelNameLower } from "@/lib/format";
+import { formatModelNameShort } from "@/lib/format";
+import { cn } from "@/lib/utils";
 import type { SandboxEvent } from "@/types/session";
 
 // Hook to access session context
@@ -39,6 +44,14 @@ type EventGroup =
   | { type: "tool_group"; events: SandboxEvent[]; id: string }
   | { type: "question"; event: SandboxEvent; id: string }
   | { type: "single"; event: SandboxEvent; id: string };
+
+// Message chain type - groups all assistant activity between user messages
+interface MessageChainGroup {
+  id: string;
+  events: SandboxEvent[];
+  groups: EventGroup[];
+  isComplete: boolean;
+}
 
 // Group consecutive tool calls of the same type
 function groupEvents(events: SandboxEvent[]): EventGroup[] {
@@ -87,6 +100,62 @@ function groupEvents(events: SandboxEvent[]): EventGroup[] {
   flushToolGroup();
 
   return groups;
+}
+
+// Render item type - can be user message or chain
+type RenderItem =
+  | { type: "user_message"; event: SandboxEvent; id: string }
+  | { type: "chain"; chain: MessageChainGroup; id: string };
+
+// Group events into message chains - all assistant activity between user messages
+function groupIntoMessageChains(events: SandboxEvent[], isProcessing: boolean): RenderItem[] {
+  const items: RenderItem[] = [];
+  let currentChainEvents: SandboxEvent[] = [];
+  let chainCounter = 0;
+
+  const flushChain = (isComplete: boolean) => {
+    if (currentChainEvents.length > 0) {
+      const groups = groupEvents(currentChainEvents);
+      const chainId = `chain-${chainCounter++}`;
+      items.push({
+        type: "chain",
+        chain: {
+          id: chainId,
+          events: [...currentChainEvents],
+          groups,
+          isComplete,
+        },
+        id: chainId,
+      });
+      currentChainEvents = [];
+    }
+  };
+
+  for (const event of events) {
+    if (event.type === "user_message") {
+      // Flush current chain as complete before user message
+      flushChain(true);
+      items.push({
+        type: "user_message",
+        event,
+        id: `user-${event.messageId || event.timestamp}`,
+      });
+    } else if (event.type === "execution_complete") {
+      // Mark chain as complete but don't include the event in display
+      currentChainEvents.push(event);
+      flushChain(true);
+    } else {
+      // Add to current chain
+      currentChainEvents.push(event);
+    }
+  }
+
+  // Flush remaining events - not complete if still processing
+  if (currentChainEvents.length > 0) {
+    flushChain(!isProcessing);
+  }
+
+  return items;
 }
 
 // Model options configuration
@@ -158,7 +227,7 @@ export default function SessionPage() {
 
   if (authPending) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="h-full flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground" />
       </div>
     );
@@ -166,9 +235,7 @@ export default function SessionPage() {
 
   return (
     <SessionContext value={session}>
-      <SidebarLayout>
-        <SessionContent />
-      </SidebarLayout>
+      <SessionContent />
     </SessionContext>
   );
 }
@@ -183,6 +250,7 @@ function SessionContent() {
     events,
     participants,
     artifacts,
+    filesChanged,
     currentParticipantId,
     isProcessing,
     sendPrompt,
@@ -193,15 +261,58 @@ function SessionContent() {
   } = useSession();
 
   const { isOpen, toggle } = useSidebarContext();
+  const { setRightPanelContent } = useRightPanelContext();
+  const { updateSession } = useSessionsContext();
+
+  // Compute total additions/deletions from file changes
+  const diffStats = useMemo(() => {
+    let additions = 0;
+    let deletions = 0;
+    for (const file of filesChanged) {
+      additions += file.additions;
+      deletions += file.deletions;
+    }
+    return { additions, deletions };
+  }, [filesChanged]);
+
+  // Sync session data to sidebar when WebSocket connects with fresh data
+  // This updates the sidebar with the real title from the Durable Object
+  // (the API returns stale KV data, so we need to sync from WebSocket)
+  useEffect(() => {
+    if (sessionState?.id) {
+      updateSession(sessionState.id, {
+        title: sessionState.title,
+        status: sessionState.status,
+        branchName: sessionState.branchName,
+        repoOwner: sessionState.repoOwner,
+        repoName: sessionState.repoName,
+        createdAt: sessionState.createdAt,
+        updatedAt: Date.now(),
+        additions: diffStats.additions,
+        deletions: diffStats.deletions,
+      });
+    }
+  }, [
+    sessionState?.id,
+    sessionState?.title,
+    sessionState?.status,
+    sessionState?.branchName,
+    sessionState?.repoOwner,
+    sessionState?.repoName,
+    sessionState?.createdAt,
+    diffStats.additions,
+    diffStats.deletions,
+    updateSession,
+  ]);
 
   // Local UI state
-  const [prompt, setPrompt] = useState("");
   const [selectedModel, setSelectedModel] = useState(
     "amazon-bedrock/anthropic.claude-opus-4-5-20251101-v1:0"
   );
   const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
+  const [thinkingEnabled, setThinkingEnabled] = useState(true);
+  const [planEnabled, setPlanEnabled] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLTextAreaElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const modelDropdownRef = useRef<HTMLDivElement>(null);
   const prevEventsLengthRef = useRef(0);
@@ -223,12 +334,47 @@ function SessionContent() {
           const answers = Array.isArray(parsedOutput) ? parsedOutput : [[parsedOutput]];
           answered.set(requestId, { questions, answers });
         } catch {
-          answered.set(requestId, { questions, answers: [[event.output]] });
+          // Try to parse the verbose output format: "Question"="Answer", "Question2"="Answer2"
+          const extractedAnswers: string[][] = [];
+          for (const q of questions) {
+            // Look for pattern: "question text"="answer text"
+            const escapedQuestion = q.question.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+            const pattern = new RegExp(`"${escapedQuestion}"\\s*=\\s*"([^"]*)"`, "i");
+            const match = event.output.match(pattern);
+            if (match) {
+              extractedAnswers.push([match[1]]);
+            } else {
+              extractedAnswers.push([]);
+            }
+          }
+          // If we extracted any answers, use them; otherwise fall back to empty
+          const hasAnswers = extractedAnswers.some((a) => a.length > 0);
+          answered.set(requestId, {
+            questions,
+            answers: hasAnswers ? extractedAnswers : questions.map(() => []),
+          });
         }
       }
     }
     return answered;
   }, [events]);
+
+  // Derive pending question (first unanswered question) for the composer
+  const pendingQuestion: PendingQuestion | null = useMemo(() => {
+    for (const event of events) {
+      if (event.type === "tool_call" && event.tool === "question" && event.status !== "completed") {
+        const requestId = (event.args?.id as string) || event.callId || "";
+        // Check if this question has been answered
+        if (!answeredQuestions.has(requestId)) {
+          const questions = (event.args?.questions as QuestionInfo[]) || [];
+          if (questions.length > 0) {
+            return { requestId, questions };
+          }
+        }
+      }
+    }
+    return null;
+  }, [events, answeredQuestions]);
 
   // Archive handlers (still REST for now - session mutations)
   const handleArchive = useCallback(async () => {
@@ -282,32 +428,43 @@ function SessionContent() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // Set up right panel content
+  useEffect(() => {
+    setRightPanelContent(
+      <SessionRightSidebar
+        sessionState={sessionState}
+        participants={participants}
+        events={events}
+        artifacts={artifacts}
+      />
+    );
+
+    return () => {
+      setRightPanelContent(null);
+    };
+  }, [sessionState, participants, events, artifacts, setRightPanelContent]);
+
   // Check if sandbox is ready to accept messages
   const sandboxReady =
     sessionState?.sandboxStatus === "ready" || sessionState?.sandboxStatus === "running";
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!prompt.trim() || isProcessing || !sandboxReady) return;
-    sendPrompt(prompt, selectedModel);
-    setPrompt("");
-  };
+  // Composer handlers
+  const handlePromptSubmit = useCallback(
+    (prompt: string) => {
+      if (!prompt.trim() || isProcessing || !sandboxReady) return;
+      sendPrompt(prompt, selectedModel);
+      // Trigger typing indicator
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = setTimeout(() => sendTyping(), 300);
+    },
+    [isProcessing, sandboxReady, selectedModel, sendPrompt, sendTyping]
+  );
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSubmit(e);
-    }
-  };
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setPrompt(e.target.value);
-    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-    typingTimeoutRef.current = setTimeout(() => sendTyping(), 300);
-  };
-
-  // Group events for rendering (deduplication now happens in the hook)
-  const groupedEvents = useMemo(() => groupEvents(events), [events]);
+  // Group events into message chains for rendering
+  const renderItems = useMemo(
+    () => groupIntoMessageChains(events, isProcessing),
+    [events, isProcessing]
+  );
 
   return (
     <div className="h-full flex flex-col">
@@ -342,7 +499,6 @@ function SessionContent() {
                 connecting={connecting}
                 sandboxStatus={sessionState.sandboxStatus}
               />
-              <ParticipantsList participants={participants} />
               <UserMenu />
             </div>
           </div>
@@ -363,66 +519,91 @@ function SessionContent() {
       )}
 
       {/* Main content */}
-      <main className="flex-1 flex overflow-hidden">
+      <main className="flex-1 overflow-hidden">
         {/* Event timeline */}
-        <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-4">
+        <div ref={scrollContainerRef} className="h-full overflow-y-auto p-4">
           <div className="max-w-3xl mx-auto space-y-2">
             {connecting && events.length === 0 && <MessageListSkeleton />}
-            {groupedEvents.map((group) => {
-              if (group.type === "tool_group") {
-                return <ToolCallGroup key={group.id} events={group.events} groupId={group.id} />;
-              }
-              if (group.type === "question") {
-                const event = group.event;
-                const requestId = (event.args?.id as string) || event.callId || group.id;
-                const questions = (event.args?.questions as QuestionInfo[]) || [];
-                const answered = answeredQuestions.get(requestId);
-
-                // Show answered state if we have it (from events with status=completed)
-                if (answered) {
-                  return (
-                    <AnsweredQuestion
-                      key={group.id}
-                      questions={answered.questions}
-                      answers={answered.answers}
-                    />
-                  );
-                }
-
-                // Show unanswered question card
+            {renderItems.map((item) => {
+              if (item.type === "user_message") {
                 return (
-                  <QuestionCard
-                    key={group.id}
-                    requestId={requestId}
-                    questions={questions}
-                    onAnswer={handleQuestionAnswer}
+                  <EventItem
+                    key={item.id}
+                    event={item.event}
+                    currentParticipantId={currentParticipantId}
                   />
                 );
               }
+              // Render message chain
+              const { chain } = item;
+
+              // Find the last token group (final message to always show)
+              let lastTokenGroupIndex = -1;
+              for (let i = chain.groups.length - 1; i >= 0; i--) {
+                const g = chain.groups[i];
+                if (g.type === "single" && g.event.type === "token") {
+                  lastTokenGroupIndex = i;
+                  break;
+                }
+              }
+
+              // Split into collapsible content and final message
+              const collapsibleGroups =
+                lastTokenGroupIndex >= 0
+                  ? chain.groups.slice(0, lastTokenGroupIndex)
+                  : chain.groups;
+              const finalGroup =
+                lastTokenGroupIndex >= 0 ? chain.groups[lastTokenGroupIndex] : null;
+
+              const renderGroup = (group: (typeof chain.groups)[0]) => {
+                if (group.type === "tool_group") {
+                  return (
+                    <ToolCallGroup key={group.id} events={group.events} groupId={group.id} />
+                  );
+                }
+                if (group.type === "question") {
+                  const event = group.event;
+                  const requestId = (event.args?.id as string) || event.callId || group.id;
+                  const answered = answeredQuestions.get(requestId);
+
+                  if (answered) {
+                    return (
+                      <AnsweredQuestion
+                        key={group.id}
+                        questions={answered.questions}
+                        answers={answered.answers}
+                      />
+                    );
+                  }
+                  return null;
+                }
+                return (
+                  <EventItem
+                    key={group.id}
+                    event={group.event}
+                    currentParticipantId={currentParticipantId}
+                  />
+                );
+              };
+
               return (
-                <EventItem
-                  key={group.id}
-                  event={group.event}
-                  currentParticipantId={currentParticipantId}
+                <MessageChain
+                  key={chain.id}
+                  events={chain.events}
+                  isComplete={chain.isComplete}
+                  collapsibleContent={collapsibleGroups.map(renderGroup)}
+                  finalContent={finalGroup ? renderGroup(finalGroup) : undefined}
                 />
               );
             })}
             {isProcessing && <ThinkingIndicator />}
           </div>
         </div>
-
-        {/* Right sidebar */}
-        <SessionRightSidebar
-          sessionState={sessionState}
-          participants={participants}
-          events={events}
-          artifacts={artifacts}
-        />
       </main>
 
       {/* Input */}
-      <footer className="border-t border-border-muted flex-shrink-0">
-        <form onSubmit={handleSubmit} className="max-w-4xl mx-auto p-4">
+      <footer className="flex-shrink-0">
+        <div className="max-w-4xl mx-auto px-4 pb-4">
           {/* Action bar above input */}
           <div className="mb-3">
             <ActionBar.Root
@@ -432,110 +613,79 @@ function SessionContent() {
             >
               <ActionBar.PreviewLink />
               <ActionBar.PrLink />
-              <ActionBar.ArchiveToggle onArchive={handleArchive} onUnarchive={handleUnarchive} />
-              <ActionBar.Menu />
             </ActionBar.Root>
           </div>
 
-          {/* Input container */}
-          <div className="border border-border bg-input">
-            {/* Text input area with floating send button */}
-            <div className="relative">
-              <textarea
-                ref={inputRef}
-                value={prompt}
-                onChange={handleInputChange}
-                onKeyDown={handleKeyDown}
-                placeholder={
-                  !sandboxReady
-                    ? "Waiting for sandbox..."
-                    : isProcessing
-                      ? "Type your next message..."
-                      : "Ask or build anything"
-                }
-                className="w-full resize-none bg-transparent px-4 pt-4 pb-12 focus:outline-none text-foreground placeholder:text-secondary-foreground"
-                rows={3}
+          {/* Composer - handles both typing and question modes */}
+          <Composer.Root
+            pendingQuestion={pendingQuestion}
+            onSubmitPrompt={handlePromptSubmit}
+            onSubmitAnswer={handleQuestionAnswer}
+            disabled={!sandboxReady}
+            isProcessing={isProcessing}
+          >
+            <div
+              className={cn(
+                "relative border border-border",
+                pendingQuestion
+                  ? "rounded-sm bg-background"
+                  : "rounded-lg shadow-sm min-h-36 bg-background"
+              )}
+            >
+              {/* Content area with padding for toolbar */}
+              <div className="px-4 pb-3">
+                <Composer.ContentSlot />
+              </div>
+
+              {/* Floating toolbars (only in typing mode) */}
+              <Composer.ToolbarLeft
+                modelName={formatModelNameShort(selectedModel)}
+                onModelClick={() => !isProcessing && setModelDropdownOpen(!modelDropdownOpen)}
+                thinkingEnabled={thinkingEnabled}
+                onThinkingToggle={setThinkingEnabled}
+                planEnabled={planEnabled}
+                onPlanToggle={setPlanEnabled}
               />
-              {/* Floating action buttons */}
-              <div className="absolute bottom-3 right-3 flex items-center gap-2">
-                {isProcessing && prompt.trim() && (
-                  <span className="text-xs text-amber-600 dark:text-amber-400">Waiting...</span>
-                )}
-                {isProcessing && (
-                  <button
-                    type="button"
-                    onClick={stopExecution}
-                    className="p-2 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition"
-                    title="Stop"
-                  >
-                    <Square className="h-5 w-5" />
-                  </button>
-                )}
-                <button
-                  type="submit"
-                  disabled={!prompt.trim() || isProcessing || !sandboxReady}
-                  className="p-2 text-secondary-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition"
-                  title={
-                    !sandboxReady
-                      ? "Waiting for sandbox to be ready"
-                      : isProcessing && prompt.trim()
-                        ? "Wait for execution to complete"
-                        : "Send"
-                  }
-                >
-                  <ArrowUp className="h-5 w-5" />
-                </button>
-              </div>
-            </div>
+              <Composer.ToolbarRight
+                onStop={stopExecution}
+                onAddClick={() => {
+                  /* TODO: Open attachment dialog */
+                }}
+              />
 
-            {/* Footer row with model selector and agent label */}
-            <div className="flex items-center justify-between px-4 py-2 border-t border-border-muted">
-              {/* Left side - Model selector */}
-              <div className="relative" ref={modelDropdownRef}>
-                <button
-                  type="button"
-                  onClick={() => !isProcessing && setModelDropdownOpen(!modelDropdownOpen)}
-                  disabled={isProcessing}
-                  className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed transition"
+              {/* Model dropdown menu */}
+              {modelDropdownOpen && !pendingQuestion && (
+                <div
+                  ref={modelDropdownRef}
+                  className="absolute bottom-12 left-3 w-56 bg-background shadow-lg border border-border rounded-lg py-1 z-50"
                 >
-                  <Layers className="h-3.5 w-3.5" />
-                  <span>{formatModelNameLower(selectedModel)}</span>
-                </button>
-
-                {/* Dropdown menu */}
-                {modelDropdownOpen && (
-                  <div className="absolute bottom-full left-0 mb-2 w-56 bg-background shadow-lg border border-border py-1 z-50">
-                    {MODEL_OPTIONS.map((group, groupIdx) => (
-                      <div key={group.category}>
-                        <div
-                          className={`px-3 py-1.5 text-xs font-medium text-secondary-foreground uppercase tracking-wider ${
-                            groupIdx > 0 ? "border-t border-border-muted mt-1" : ""
-                          }`}
-                        >
-                          {group.category}
-                        </div>
-                        {group.models.map((model) => (
-                          <ModelOptionButton
-                            key={model.id}
-                            model={model}
-                            isSelected={selectedModel === model.id}
-                            onSelect={() => {
-                              setSelectedModel(model.id);
-                              setModelDropdownOpen(false);
-                            }}
-                          />
-                        ))}
+                  {MODEL_OPTIONS.map((group, groupIdx) => (
+                    <div key={group.category}>
+                      <div
+                        className={`px-3 py-1.5 text-xs font-medium text-secondary-foreground uppercase tracking-wider ${
+                          groupIdx > 0 ? "border-t border-border-muted mt-1" : ""
+                        }`}
+                      >
+                        {group.category}
                       </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Right side - Agent label */}
-              <span className="text-sm text-muted-foreground">build agent</span>
+                      {group.models.map((model) => (
+                        <ModelOptionButton
+                          key={model.id}
+                          model={model}
+                          isSelected={selectedModel === model.id}
+                          onSelect={() => {
+                            setSelectedModel(model.id);
+                            setModelDropdownOpen(false);
+                          }}
+                        />
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-          </div>
-        </form>
+          </Composer.Root>
+        </div>
       </footer>
     </div>
   );
@@ -679,7 +829,10 @@ function UserMenu() {
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={handleSignOut} className="cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-900/20">
+        <DropdownMenuItem
+          onClick={handleSignOut}
+          className="cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-900/20"
+        >
           <LogOut className="mr-2 h-4 w-4" />
           Sign out
         </DropdownMenuItem>
@@ -713,45 +866,42 @@ function EventItem({
 
   switch (event.type) {
     case "user_message": {
-      // Display user's prompt with correct author attribution
+      // Display user's prompt with correct author attribution - right aligned
       if (!event.content) return null;
 
-      // Determine if this message is from the current user
-      const isCurrentUser =
-        event.author?.participantId && currentParticipantId
-          ? event.author.participantId === currentParticipantId
-          : !event.author; // Messages without author are assumed to be from current user (local)
-
-      const authorName = isCurrentUser ? "You" : event.author?.name || "Unknown User";
-
       return (
-        <div className="bg-accent-muted p-4 ml-8">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
-              {!isCurrentUser && event.author?.avatar && (
-                <img src={event.author.avatar} alt={authorName} className="w-5 h-5 rounded-full" />
-              )}
-              <span className="text-xs font-medium text-foreground">{authorName}</span>
+        <div className="flex justify-end pb-4">
+          <div className="relative min-w-0 max-w-full">
+            <div className="max-w-xl lg:max-w-3xl p-3 rounded px-4 break-words overflow-hidden bg-highlight text-highlight-foreground">
+              <div className="text-sm break-words whitespace-pre-wrap">{event.content}</div>
             </div>
-            <span className="text-xs text-secondary-foreground">{time}</span>
           </div>
-          <SafeMarkdown content={event.content} className="text-sm" />
         </div>
       );
     }
 
-    case "token":
+    case "token": {
       // Display the model's text response with safe markdown rendering
       if (!event.content) return null;
+
+      const handleCopy = () => {
+        navigator.clipboard.writeText(event.content || "");
+      };
+
       return (
-        <div className="bg-card p-4">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs text-muted-foreground">Assistant</span>
-            <span className="text-xs text-secondary-foreground">{time}</span>
+        <div className="flex justify-start relative">
+          <div className="flex flex-col w-full max-w-xl lg:max-w-3xl space-y-1 break-words">
+            <div className="my-1">
+              <SafeMarkdown
+                content={event.content}
+                className="prose prose-sm dark:prose-invert antialiased select-text text-pretty"
+              />
+            </div>
+            <MessageFooter onCopy={handleCopy} showUndo={false} />
           </div>
-          <SafeMarkdown content={event.content} className="text-sm" />
         </div>
       );
+    }
 
     case "tool_call":
       // Tool calls are handled by ToolCallGroup component
@@ -786,13 +936,9 @@ function EventItem({
       );
 
     case "execution_complete":
-      return (
-        <div className="flex items-center gap-2 text-sm text-success">
-          <span className="w-2 h-2 rounded-full bg-success" />
-          Execution complete
-          <span className="text-xs text-secondary-foreground">{time}</span>
-        </div>
-      );
+      // Execution complete events are now handled via the message footer
+      // They don't need their own visual representation
+      return null;
 
     default:
       return null;

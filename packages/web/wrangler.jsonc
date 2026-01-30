@@ -24,8 +24,8 @@
   // Environment variables (non-secret)
   "vars": {
     "DEPLOYMENT_NAME": "dispatch",
-    "CONTROL_PLANE_URL": "https://dispatch-api.national-design-studio-development.workers.dev",
-    "NEXT_PUBLIC_WS_URL": "wss://dispatch-api.national-design-studio-development.workers.dev"
+    "CONTROL_PLANE_URL": "https://dispatch-api.based.ceo",
+    "NEXT_PUBLIC_WS_URL": "wss://dispatch-api.based.ceo"
   }
 
   // Secrets (set via: wrangler secret put <KEY>)

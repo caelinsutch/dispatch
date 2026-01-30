@@ -85,7 +85,8 @@ export type ClientMessage =
       type: "presence";
       status: "active" | "idle";
       cursor?: { line: number; file: string };
-    };
+    }
+  | { type: "question_answer"; requestId: string; answers: string[][] };
 
 // Server → Client messages
 export type ServerMessage =
@@ -102,12 +103,14 @@ export type ServerMessage =
   | { type: "presence_sync"; participants: ParticipantPresence[] }
   | { type: "presence_update"; participants: ParticipantPresence[] }
   | { type: "presence_leave"; userId: string }
-  | { type: "sandbox_warming" }
+  | { type: "sandbox_warming"; message?: string }
   | { type: "sandbox_spawning" }
   | { type: "sandbox_status"; status: string }
   | { type: "sandbox_ready" }
   | { type: "sandbox_error"; error: string }
   | { type: "error"; code: string; message: string }
+  | { type: "question_answer_queued"; requestId: string; message: string }
+  | { type: "question_answer_error"; requestId: string; error: string }
   | {
       type: "artifact_created";
       artifact: { id: string; type: string; url: string; prNumber?: number };
@@ -117,7 +120,8 @@ export type ServerMessage =
   | { type: "sandbox_warning"; message: string }
   | { type: "session_status"; status: SessionStatus }
   | { type: "processing_status"; isProcessing: boolean }
-  | { type: "active_ports_updated"; activePorts: number[] };
+  | { type: "active_ports_updated"; activePorts: number[] }
+  | { type: "history_complete" };
 
 // Sandbox events (from Modal)
 export type SandboxEvent =

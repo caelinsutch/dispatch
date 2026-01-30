@@ -120,6 +120,10 @@ export class SessionDO extends DurableObject<Env> {
     resolve: (branchName: string) => void;
     reject: (err: Error) => void;
   } | null = null;
+  // Queue for question answers when sandbox isn't connected yet
+  private pendingQuestionAnswers: Array<{ requestId: string; answers: string[][] }> = [];
+  // Track pending questions (waiting for user response) - prevents inactivity timeout
+  private pendingQuestionRequestIds: Set<string> = new Set();
 
   // Route table for internal API endpoints
   private readonly routes: InternalRoute[] = [
@@ -326,6 +330,9 @@ export class SessionDO extends DurableObject<Env> {
 
         // Process any pending messages now that sandbox is connected
         this.processMessageQueue();
+
+        // Flush any pending question answers
+        this.flushPendingQuestionAnswers();
       } else {
         // For client WebSockets, schedule authentication timeout check
         // This prevents resource abuse from connections that never authenticate
@@ -505,6 +512,19 @@ export class SessionDO extends DurableObject<Env> {
             type: "sandbox_warning",
             message:
               "Sandbox will stop in 5 minutes due to inactivity. Send a message to keep it alive.",
+          });
+          await this.ctx.storage.setAlarm(now + 5 * 60 * 1000);
+          return;
+        }
+
+        // Don't timeout if there are pending questions waiting for user response
+        if (this.pendingQuestionRequestIds.size > 0) {
+          console.log(
+            `[DO] Inactivity timeout but ${this.pendingQuestionRequestIds.size} pending questions, extending 5 min`
+          );
+          this.broadcast({
+            type: "sandbox_warning",
+            message: "Waiting for your response to the question...",
           });
           await this.ctx.storage.setAlarm(now + 5 * 60 * 1000);
           return;
@@ -837,6 +857,8 @@ export class SessionDO extends DurableObject<Env> {
     // Recover sandbox WebSocket reference after hibernation
     if (!this.sandboxWs || this.sandboxWs !== ws) {
       this.sandboxWs = ws;
+      // Flush any pending question answers now that sandbox is recovered
+      this.flushPendingQuestionAnswers();
     }
 
     try {
@@ -877,6 +899,10 @@ export class SessionDO extends DurableObject<Env> {
 
         case "presence":
           await this.updatePresence(ws, data);
+          break;
+
+        case "question_answer":
+          await this.handleQuestionAnswerWs(data);
           break;
       }
     } catch (e) {
@@ -995,9 +1021,26 @@ export class SessionDO extends DurableObject<Env> {
     );
     const messages = messagesResult.toArray() as unknown as MessageWithParticipant[];
 
-    // Get events (tool calls, tokens, etc.)
-    const eventsResult = this.sql.exec(`SELECT * FROM events ORDER BY created_at ASC LIMIT 500`);
-    const events = eventsResult.toArray() as unknown as EventRow[];
+    // Get events (tool calls, tokens, etc.) - increased limit to handle long conversations
+    const eventsResult = this.sql.exec(`SELECT * FROM events ORDER BY created_at ASC LIMIT 2000`);
+    const allEvents = eventsResult.toArray() as unknown as EventRow[];
+
+    // Filter token events to only keep the last one per message_id
+    // This avoids sending hundreds of intermediate streaming tokens
+    const lastTokenByMessage = new Map<string | null, EventRow>();
+    const nonTokenEvents: EventRow[] = [];
+
+    for (const event of allEvents) {
+      if (event.type === "token") {
+        // Keep track of the latest token per message_id
+        lastTokenByMessage.set(event.message_id, event);
+      } else {
+        nonTokenEvents.push(event);
+      }
+    }
+
+    // Combine non-token events with only the last token per message
+    const events = [...nonTokenEvents, ...Array.from(lastTokenByMessage.values())];
 
     // Combine and sort by timestamp
     interface HistoryItem {
@@ -1047,6 +1090,9 @@ export class SessionDO extends DurableObject<Env> {
         }
       }
     }
+
+    // Signal that historical events are complete
+    this.safeSend(ws, { type: "history_complete" });
   }
 
   /**
@@ -1303,6 +1349,11 @@ export class SessionDO extends DurableObject<Env> {
       if (title) {
         console.log(`[DO] Session title updated: ${title}`);
         this.sql.exec(`UPDATE session SET title = ?, updated_at = ?`, title, now);
+
+        // Proactively sync title to KV index for consistent list display
+        this.syncTitleToKV(title, now).catch((err) => {
+          console.warn(`[DO] Failed to sync title to KV:`, err);
+        });
       }
     }
 
@@ -1336,6 +1387,21 @@ export class SessionDO extends DurableObject<Env> {
 
         // Broadcast active ports update to all clients
         this.broadcast({ type: "active_ports_updated", activePorts });
+      }
+    }
+
+    // Track pending questions to prevent inactivity timeout while waiting for user response
+    if (event.type === "tool_call" && event.callId) {
+      // Explicit allowlist of question tool names (case-insensitive)
+      const toolName = event.tool?.toLowerCase() || "";
+      const questionTools = [
+        "question",
+        "askuserquestion",
+        "mcp__conductor__askuserquestion",
+      ];
+      if (questionTools.includes(toolName)) {
+        console.log(`[DO] Question tool invoked, tracking pending question: ${event.callId}`);
+        this.pendingQuestionRequestIds.add(event.callId);
       }
     }
 
@@ -1431,6 +1497,36 @@ export class SessionDO extends DurableObject<Env> {
   }
 
   /**
+   * Sync session title to KV index for consistent list display.
+   * This ensures the sessions list shows the correct title without requiring
+   * individual session fetches to trigger lazy sync.
+   */
+  private async syncTitleToKV(title: string, updatedAt: number): Promise<void> {
+    const session = this.getSession();
+    if (!session) return;
+
+    const sessionId = session.session_name || session.id;
+    const kvKey = `session:${sessionId}`;
+
+    // Get current KV data
+    const kvData = await this.env.SESSION_INDEX.get(kvKey, "json");
+    if (!kvData || typeof kvData !== "object") {
+      console.warn(`[DO] KV entry not found for ${kvKey}, skipping sync`);
+      return;
+    }
+
+    // Update title and timestamp
+    const updated = {
+      ...(kvData as Record<string, unknown>),
+      title,
+      updatedAt,
+    };
+
+    await this.env.SESSION_INDEX.put(kvKey, JSON.stringify(updated));
+    console.log(`[DO] Synced title to KV: ${title}`);
+  }
+
+  /**
    * Get the sandbox WebSocket, recovering from hibernation if needed.
    */
   private getSandboxWebSocket(): WebSocket | null {
@@ -1463,6 +1559,8 @@ export class SessionDO extends DurableObject<Env> {
         }
         console.log("[DO] Recovered sandbox WebSocket from hibernation");
         this.sandboxWs = ws;
+        // Flush any pending question answers
+        this.flushPendingQuestionAnswers();
         return ws;
       }
     }
@@ -2002,6 +2100,90 @@ export class SessionDO extends DurableObject<Env> {
     return new Response(JSON.stringify({ success: true }), {
       headers: { "Content-Type": "application/json" },
     });
+  }
+
+  /**
+   * Handle question answer from WebSocket client - forward to sandbox.
+   */
+  private async handleQuestionAnswerWs(data: {
+    requestId: string;
+    answers: string[][];
+  }): Promise<void> {
+    console.log("[DO] Received question_answer from client:", {
+      requestId: data.requestId,
+      answerCount: data.answers.length,
+    });
+
+    const sandboxWs = this.getSandboxWebSocket();
+    if (!sandboxWs) {
+      console.log("[DO] Sandbox not connected, queueing question answer for later");
+      this.pendingQuestionAnswers.push({
+        requestId: data.requestId,
+        answers: data.answers,
+      });
+
+      // Check sandbox status and try to restore if stopped
+      const sandbox = this.getSandbox();
+      if (sandbox?.status === "stopped" || sandbox?.status === "stale") {
+        console.log("[DO] Sandbox is stopped, triggering restore for queued question answer");
+        // Broadcast that we're restoring to handle the answer
+        this.broadcast({
+          type: "sandbox_warming",
+          message: "Restoring sandbox to process your answer...",
+        });
+        // Trigger spawn/restore (will use snapshot if available)
+        await this.spawnSandbox();
+      } else if (sandbox?.status === "spawning" || sandbox?.status === "connecting") {
+        // Already spawning, just wait
+        console.log("[DO] Sandbox is already spawning, answer queued");
+        this.broadcast({
+          type: "question_answer_queued",
+          requestId: data.requestId,
+          message: "Answer queued, sandbox is starting...",
+        });
+      } else {
+        // Some other state - broadcast error
+        console.log(`[DO] Sandbox in unexpected state: ${sandbox?.status}`);
+        this.broadcast({
+          type: "question_answer_error",
+          requestId: data.requestId,
+          error: "Unable to process answer - sandbox unavailable",
+        });
+      }
+      return;
+    }
+
+    console.log("[DO] Forwarding question_reply to sandbox");
+    this.safeSend(sandboxWs, {
+      type: "question_reply",
+      requestId: data.requestId,
+      answers: data.answers,
+    });
+
+    // Clear the pending question flag
+    this.pendingQuestionRequestIds.delete(data.requestId);
+  }
+
+  /**
+   * Flush any pending question answers to the sandbox.
+   */
+  private flushPendingQuestionAnswers(): void {
+    if (this.pendingQuestionAnswers.length === 0) return;
+
+    const sandboxWs = this.getSandboxWebSocket();
+    if (!sandboxWs) return;
+
+    console.log(`[DO] Flushing ${this.pendingQuestionAnswers.length} pending question answers`);
+    for (const pending of this.pendingQuestionAnswers) {
+      this.safeSend(sandboxWs, {
+        type: "question_reply",
+        requestId: pending.requestId,
+        answers: pending.answers,
+      });
+      // Clear the pending question flag
+      this.pendingQuestionRequestIds.delete(pending.requestId);
+    }
+    this.pendingQuestionAnswers = [];
   }
 
   private getMessageCount(): number {
@@ -2882,6 +3064,9 @@ export class SessionDO extends DurableObject<Env> {
       session.id
     );
 
+    // Stop the sandbox to free resources
+    await this.stopSandbox();
+
     // Broadcast status change to all connected clients
     this.broadcast({
       type: "session_status",
@@ -2889,6 +3074,24 @@ export class SessionDO extends DurableObject<Env> {
     });
 
     return Response.json({ status: "archived" });
+  }
+
+  /**
+   * Stop the sandbox gracefully.
+   */
+  private async stopSandbox(): Promise<void> {
+    const sandboxWs = this.getSandboxWebSocket();
+    if (sandboxWs) {
+      console.log("[DO] Stopping sandbox");
+      this.safeSend(sandboxWs, { type: "shutdown" });
+      try {
+        sandboxWs.close(1000, "Session archived");
+      } catch {
+        // Ignore errors closing WebSocket
+      }
+      this.sandboxWs = null;
+    }
+    this.updateSandboxStatus("stopped");
   }
 
   /**

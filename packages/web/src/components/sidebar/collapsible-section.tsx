@@ -8,26 +8,28 @@ interface CollapsibleSectionProps {
   title: string;
   defaultOpen?: boolean;
   children: React.ReactNode;
+  className?: string;
 }
 
 export function CollapsibleSection({
   title,
   defaultOpen = true,
   children,
+  className,
 }: CollapsibleSectionProps) {
   const [isOpen, setIsOpen] = useState(defaultOpen);
 
   return (
-    <div className="border-b border-border-muted last:border-b-0">
+    <div className={cn("border-b border-border-muted last:border-b-0", className)}>
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center justify-between w-full px-4 py-3 text-sm font-medium text-foreground hover:bg-muted transition-colors"
+        className="flex items-center justify-between w-full px-4 py-3 hover:bg-muted/50 transition-colors group"
       >
-        <span>{title}</span>
+        <span className="sidebar-label">{title}</span>
         <ChevronDown
           className={cn(
-            "h-4 w-4 text-secondary-foreground transition-transform",
+            "h-3 w-3 text-muted-foreground transition-transform group-hover:text-foreground",
             isOpen && "rotate-180"
           )}
         />

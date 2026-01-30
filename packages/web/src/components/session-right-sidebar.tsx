@@ -11,6 +11,7 @@ import {
   PreviewSection,
   TasksSection,
 } from "./sidebar";
+import { Panel, PanelContent, PanelHeader, PanelTitle } from "./ui/panel";
 import { RightSidebarSkeleton } from "./ui/skeleton";
 
 interface SessionState {
@@ -66,23 +67,33 @@ export function SessionRightSidebar({
   }
 
   return (
-    <aside className="w-80 border-l border-border-muted overflow-y-auto hidden lg:block">
+    <aside className="h-full overflow-y-auto">
       {/* Participants */}
-      <div className="px-4 py-4 border-b border-border-muted">
-        <ParticipantsSection participants={participants} />
-      </div>
+      <Panel variant="ghost" padding="md" className="border-b border-border-muted rounded-none">
+        <PanelHeader>
+          <PanelTitle>Participants</PanelTitle>
+        </PanelHeader>
+        <PanelContent>
+          <ParticipantsSection participants={participants} />
+        </PanelContent>
+      </Panel>
 
       {/* Metadata */}
-      <div className="px-4 py-4 border-b border-border-muted">
-        <MetadataSection
-          createdAt={sessionState.createdAt}
-          model={sessionState.model}
-          branchName={sessionState.branchName || undefined}
-          repoOwner={sessionState.repoOwner}
-          repoName={sessionState.repoName}
-          artifacts={artifacts}
-        />
-      </div>
+      <Panel variant="ghost" padding="md" className="border-b border-border-muted rounded-none">
+        <PanelHeader>
+          <PanelTitle>Session Info</PanelTitle>
+        </PanelHeader>
+        <PanelContent>
+          <MetadataSection
+            createdAt={sessionState.createdAt}
+            model={sessionState.model}
+            branchName={sessionState.branchName || undefined}
+            repoOwner={sessionState.repoOwner}
+            repoName={sessionState.repoName}
+            artifacts={artifacts}
+          />
+        </PanelContent>
+      </Panel>
 
       {/* Live Preview - only show when ports are detected in output */}
       {sessionState.tunnelUrls &&
@@ -105,18 +116,20 @@ export function SessionRightSidebar({
 
       {/* Files Changed */}
       {filesChanged.length > 0 && (
-        <CollapsibleSection title="Files changed" defaultOpen={true}>
+        <CollapsibleSection title="Files Changed" defaultOpen={true}>
           <FilesChangedSection files={filesChanged} />
         </CollapsibleSection>
       )}
 
       {/* Artifacts info when no specific sections are populated */}
       {tasks.length === 0 && filesChanged.length === 0 && artifacts.length === 0 && (
-        <div className="px-4 py-4">
-          <p className="text-sm text-muted-foreground">
-            Tasks and file changes will appear here as the agent works.
-          </p>
-        </div>
+        <Panel variant="ghost" padding="md" className="rounded-none">
+          <PanelContent>
+            <p className="text-sm text-muted-foreground">
+              Tasks and file changes will appear here as the agent works.
+            </p>
+          </PanelContent>
+        </Panel>
       )}
     </aside>
   );

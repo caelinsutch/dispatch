@@ -2,21 +2,12 @@
 
 import { PanelLeft, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { SidebarLayout, useSidebarContext } from "@/components/sidebar-layout";
+import { useSidebarContext } from "@/components/sidebar-layout";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
 
 export default function Home() {
   const router = useRouter();
-
-  return (
-    <SidebarLayout>
-      <HomeContent onNewSession={() => router.push("/session/new")} />
-    </SidebarLayout>
-  );
-}
-
-function HomeContent({ onNewSession }: { onNewSession: () => void }) {
   const { isOpen, toggle } = useSidebarContext();
 
   return (
@@ -38,7 +29,7 @@ function HomeContent({ onNewSession }: { onNewSession: () => void }) {
           <p className="text-muted-foreground mb-8">
             Select a session from the sidebar or create a new one to get started.
           </p>
-          <Button size="lg" onClick={onNewSession}>
+          <Button size="lg" onClick={() => router.push("/session/new")}>
             <Plus className="h-5 w-5" />
             New Session
           </Button>

@@ -489,12 +489,13 @@ class AgentBridge:
 
             tool_name = part.get("tool", "")
             output = state.get("output", "")
+            metadata = state.get("metadata", {})
 
             # Scan Bash tool outputs for localhost URLs (for live preview)
             if tool_name == "Bash" and output:
                 self._scan_for_ports(output, message_id)
 
-            return {
+            event = {
                 "type": "tool_call",
                 "tool": tool_name,
                 "args": args,
@@ -503,6 +504,12 @@ class AgentBridge:
                 "output": output,
                 "messageId": message_id,
             }
+
+            # Include metadata for tools that have it (e.g., Task tool summary)
+            if metadata:
+                event["metadata"] = metadata
+
+            return event
         elif part_type == "step-finish":
             return {
                 "type": "step_finish",
@@ -768,7 +775,21 @@ class AgentBridge:
 
                                     status = state.get("status", "")
                                     call_id = part.get("callID", "")
-                                    tool_key = f"tool:{call_id}:{status}"
+
+                                    # For Task tools, include summary length in key so we send updates
+                                    # when nested tools are added/updated
+                                    tool_name = tool_event.get("tool", "").lower()
+                                    if tool_name == "task":
+                                        metadata = state.get("metadata", {})
+                                        summary = metadata.get("summary", [])
+                                        # Include summary length and last item status for dedup
+                                        summary_key = f"{len(summary)}"
+                                        if summary:
+                                            last_status = summary[-1].get("state", {}).get("status", "")
+                                            summary_key = f"{len(summary)}:{last_status}"
+                                        tool_key = f"tool:{call_id}:{status}:{summary_key}"
+                                    else:
+                                        tool_key = f"tool:{call_id}:{status}"
 
                                     if tool_key not in emitted_tool_states:
                                         emitted_tool_states.add(tool_key)
@@ -1155,6 +1176,22 @@ class AgentBridge:
 
             print(f"[bridge] Question reply sent successfully for {request_id}")
 
+            # Emit tool_call completed event immediately so the UI updates
+            # This prevents race condition where OpenCode's completed event
+            # might be missed because it's emitted before we subscribe to SSE
+            await self._send_event(
+                {
+                    "type": "tool_call",
+                    "tool": "question",
+                    "callId": request_id,
+                    "args": {"id": request_id},
+                    "status": "completed",
+                    "output": json.dumps(answers),
+                    "messageId": message_id,
+                }
+            )
+            print(f"[bridge] Emitted question completed event for {request_id}")
+
             # Subscribe to SSE and stream continuation events
             print("[bridge] Subscribing to SSE for continuation events...")
             async for event in self._stream_sse_continuation(message_id):
@@ -1308,7 +1345,21 @@ class AgentBridge:
                                     state = part.get("state", {})
                                     status = state.get("status", "")
                                     call_id = part.get("callID", "")
-                                    tool_key = f"tool:{call_id}:{status}"
+
+                                    # For Task tools, include summary length in key so we send updates
+                                    # when nested tools are added/updated
+                                    tool_name = tool_event.get("tool", "").lower()
+                                    if tool_name == "task":
+                                        metadata = state.get("metadata", {})
+                                        summary = metadata.get("summary", [])
+                                        # Include summary length and last item status for dedup
+                                        summary_key = f"{len(summary)}"
+                                        if summary:
+                                            last_status = summary[-1].get("state", {}).get("status", "")
+                                            summary_key = f"{len(summary)}:{last_status}"
+                                        tool_key = f"tool:{call_id}:{status}:{summary_key}"
+                                    else:
+                                        tool_key = f"tool:{call_id}:{status}"
 
                                     if tool_key not in emitted_tool_states:
                                         emitted_tool_states.add(tool_key)
