@@ -4,6 +4,7 @@ import { Minus, Plus } from "lucide-react";
 import type { SandboxEvent } from "@/lib/tool-formatters";
 import { formatToolCall } from "@/lib/tool-formatters";
 import { getIconByName } from "@/lib/tool-icons";
+import { TaskCallItem } from "./task-call-item";
 
 interface ToolCallItemProps {
   event: SandboxEvent;
@@ -12,6 +13,11 @@ interface ToolCallItemProps {
 }
 
 export function ToolCallItem({ event, isExpanded, onToggle }: ToolCallItemProps) {
+  // Use dedicated component for Task tool calls
+  if (event.tool?.toLowerCase() === "task") {
+    return <TaskCallItem event={event} isExpanded={isExpanded} onToggle={onToggle} />;
+  }
+
   const formatted = formatToolCall(event);
   const { args, output } = formatted.getDetails();
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { ChevronRight } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { SandboxEvent } from "@/lib/tool-formatters";
 import { formatToolGroup } from "@/lib/tool-formatters";
 import { getToolIcon } from "@/lib/tool-icons";
@@ -66,14 +66,41 @@ function calculateExecutionTime(events: SandboxEvent[]): number | undefined {
 export function ToolCallGroup({ events, groupId }: ToolCallGroupProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
+  const [wasManuallyToggled, setWasManuallyToggled] = useState(false);
 
   const formatted = formatToolGroup(events);
   const firstEvent = events[0];
   const uniqueTools = getUniqueToolTypes(events);
+
+  // Auto-expand Task tools while running, collapse when complete
+  const isTaskTool = firstEvent?.tool?.toLowerCase() === "task";
+  const isRunning = firstEvent?.status === "running";
+
+  useEffect(() => {
+    if (isTaskTool && events.length === 1 && !wasManuallyToggled) {
+      const itemKey = `${groupId}-0`;
+      if (isRunning) {
+        // Auto-expand while running
+        setExpandedItems((prev) => {
+          const newSet = new Set(prev);
+          newSet.add(itemKey);
+          return newSet;
+        });
+      } else {
+        // Auto-collapse when complete
+        setExpandedItems((prev) => {
+          const newSet = new Set(prev);
+          newSet.delete(itemKey);
+          return newSet;
+        });
+      }
+    }
+  }, [isTaskTool, isRunning, groupId, wasManuallyToggled, events.length]);
   const fileChanges = extractFileChanges(events);
   const executionTime = calculateExecutionTime(events);
 
   const toggleItem = (itemId: string) => {
+    setWasManuallyToggled(true);
     setExpandedItems((prev) => {
       const newSet = new Set(prev);
       if (newSet.has(itemId)) {

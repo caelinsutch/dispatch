@@ -153,7 +153,7 @@ export function formatToolCall(event: SandboxEvent): FormattedToolCall {
       return {
         toolName: "Task",
         summary: description ? `${typeLabel}${truncate(description, 40)}` : "task",
-        icon: "brain",
+        icon: "bot",
         showArgs: false,
         getDetails: () => ({ args, output }),
       };

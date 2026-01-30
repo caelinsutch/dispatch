@@ -179,6 +179,17 @@ export function useSessionSocket(sessionId: string): UseSessionSocketReturn {
               }
               setEvents((prev) => [...prev, event]);
             } else if (event.type === "tool_call" && event.callId) {
+              // DEBUG: Log Task tool events to trace metadata
+              if (event.tool?.toLowerCase() === "task") {
+                console.log("[useSessionSocket] TASK TOOL EVENT:", {
+                  tool: event.tool,
+                  status: event.status,
+                  callId: event.callId,
+                  hasMetadata: !!event.metadata,
+                  metadata: event.metadata,
+                  args: event.args,
+                });
+              }
               // Deduplicate tool_call events by callId - merge with existing to preserve args
               setEvents((prev) => {
                 const existingIdx = seenToolCallsRef.current.get(event.callId!);
@@ -187,12 +198,23 @@ export function useSessionSocket(sessionId: string): UseSessionSocketReturn {
                   // while updating status and output from the new event
                   const existing = prev[existingIdx];
                   const updated = [...prev];
-                  updated[existingIdx] = {
+                  const merged = {
                     ...existing,
                     ...event,
                     // Merge args to preserve original data like questions
                     args: { ...(existing.args || {}), ...(event.args || {}) },
+                    // Preserve metadata from new event (if present)
+                    metadata: event.metadata || existing.metadata,
                   };
+                  // DEBUG: Log merge for Task tools
+                  if (event.tool?.toLowerCase() === "task") {
+                    console.log("[useSessionSocket] TASK MERGE:", {
+                      existingMetadata: existing.metadata,
+                      newMetadata: event.metadata,
+                      finalMetadata: merged.metadata,
+                    });
+                  }
+                  updated[existingIdx] = merged;
                   return updated;
                 }
                 // Track new tool call (or update stale index)

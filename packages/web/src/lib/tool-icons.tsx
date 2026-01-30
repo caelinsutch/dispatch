@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Bot,
   Brain,
   FileSearch,
   FileText,
@@ -72,7 +73,7 @@ export function getToolIcon(
     case "Grep":
       return <Search className={iconClass} />;
     case "Task":
-      return <Brain className={iconClass} />;
+      return <Bot className={iconClass} />;
     case "Webfetch":
       return <Globe className={iconClass} />;
     case "Todoread":
@@ -123,6 +124,8 @@ export function getIconByName(
       return <MessageSquareMore className={iconClass} />;
     case "brain":
       return <Brain className={iconClass} />;
+    case "bot":
+      return <Bot className={iconClass} />;
     case "list":
       return <ListTodo className={iconClass} />;
     default:

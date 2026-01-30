@@ -304,7 +304,7 @@ function Textarea({
         autoCorrect="off"
         autoCapitalize="off"
         className={cn(
-          "w-full resize-none bg-transparent focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 text-foreground placeholder:text-muted-foreground",
+          "w-full resize-none bg-transparent py-3 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 text-foreground placeholder:text-muted-foreground",
           className
         )}
         style={{ outline: "none", boxShadow: "none" }}

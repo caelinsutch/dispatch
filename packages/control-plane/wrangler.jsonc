@@ -42,7 +42,8 @@
 
   // Environment variables (non-secret)
   "vars": {
-    "DEPLOYMENT_NAME": "dispatch"
+    "DEPLOYMENT_NAME": "dispatch",
+    "WORKER_URL": "https://dispatch-api.based.ceo"
   },
 
   // Observability

@@ -63,6 +63,16 @@ export function MessageChain({
     );
   }
 
+  // While processing (not complete), render tools directly without accordion
+  if (!isComplete) {
+    return (
+      <>
+        {collapsibleContent}
+        {finalContent}
+      </>
+    );
+  }
+
   // Build summary text - only show tool calls count
   const summaryText = `${toolCallCount} tool call${toolCallCount !== 1 ? "s" : ""}`;
 
