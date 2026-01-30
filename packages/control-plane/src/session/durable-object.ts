@@ -200,13 +200,6 @@ export class SessionDO extends DurableObject<Env> {
   }
 
   /**
-   * Normalize branch name for comparison to handle case and whitespace differences.
-   */
-  private normalizeBranchName(name: string): string {
-    return name.trim().toLowerCase();
-  }
-
-  /**
    * Initialize the session with required data.
    */
   private ensureInitialized(): void {
@@ -1868,8 +1861,16 @@ export class SessionDO extends DurableObject<Env> {
           result.tunnelUrls ? JSON.stringify(result.tunnelUrls) : null
         );
         console.log(
-          `[DO] Stored modal_object_id: ${result.modalObjectId}, tunnelUrls: ${result.tunnelUrls ? Object.keys(result.tunnelUrls).length + " ports" : "none"}`
+          `[DO] Stored modal_object_id: ${result.modalObjectId}, tunnelUrls: ${result.tunnelUrls ? `${Object.keys(result.tunnelUrls).length} ports` : "none"}`
         );
+
+        // Broadcast tunnel URLs to connected clients
+        if (result.tunnelUrls && Object.keys(result.tunnelUrls).length > 0) {
+          this.broadcast({
+            type: "tunnel_urls_updated",
+            tunnelUrls: result.tunnelUrls,
+          });
+        }
       }
 
       this.updateSandboxStatus("connecting");
@@ -2674,7 +2675,7 @@ export class SessionDO extends DurableObject<Env> {
 
   private handleListEvents(url: URL): Response {
     const cursor = url.searchParams.get("cursor");
-    const limit = Math.min(parseInt(url.searchParams.get("limit") ?? "50"), 200);
+    const limit = Math.min(parseInt(url.searchParams.get("limit") ?? "50", 10), 200);
     const type = url.searchParams.get("type");
     const messageId = url.searchParams.get("message_id");
 
@@ -2698,7 +2699,7 @@ export class SessionDO extends DurableObject<Env> {
 
     if (cursor) {
       query += ` AND created_at < ?`;
-      params.push(parseInt(cursor));
+      params.push(parseInt(cursor, 10));
     }
 
     query += ` ORDER BY created_at DESC LIMIT ?`;
@@ -2740,7 +2741,7 @@ export class SessionDO extends DurableObject<Env> {
 
   private handleListMessages(url: URL): Response {
     const cursor = url.searchParams.get("cursor");
-    const limit = Math.min(parseInt(url.searchParams.get("limit") ?? "50"), 100);
+    const limit = Math.min(parseInt(url.searchParams.get("limit") ?? "50", 10), 100);
     const status = url.searchParams.get("status");
 
     // Validate status parameter if provided
@@ -2761,7 +2762,7 @@ export class SessionDO extends DurableObject<Env> {
 
     if (cursor) {
       query += ` AND created_at < ?`;
-      params.push(parseInt(cursor));
+      params.push(parseInt(cursor, 10));
     }
 
     query += ` ORDER BY created_at DESC LIMIT ?`;
@@ -2864,7 +2865,7 @@ export class SessionDO extends DurableObject<Env> {
       // Append session link footer to agent's PR body
       const webAppUrl = this.env.WEB_APP_URL || this.env.WORKER_URL || "";
       const sessionUrl = `${webAppUrl}/session/${sessionId}`;
-      const fullBody = body.body + `\n\n---\n*Created with [Dispatch](${sessionUrl})*`;
+      const fullBody = `${body.body}\n\n---\n*Created with [Dispatch](${sessionUrl})*`;
 
       // Create the PR using GitHub API (using the prompting user's token)
       const prResult = await createPullRequest(
@@ -3028,7 +3029,7 @@ export class SessionDO extends DurableObject<Env> {
   /**
    * Handle archive session request.
    * Sets session status to "archived" and broadcasts to all clients.
-   * Only session participants are authorized to archive.
+   * Any authenticated user can archive any session.
    */
   private async handleArchive(request: Request): Promise<Response> {
     const session = this.getSession();
@@ -3036,21 +3037,11 @@ export class SessionDO extends DurableObject<Env> {
       return Response.json({ error: "Session not found" }, { status: 404 });
     }
 
-    // Verify user is a participant (fail closed)
-    let body: { userId?: string };
+    // Parse body but don't require participant check
     try {
-      body = (await request.json()) as { userId?: string };
+      await request.json();
     } catch {
-      return Response.json({ error: "Invalid request body" }, { status: 400 });
-    }
-
-    if (!body.userId) {
-      return Response.json({ error: "userId is required" }, { status: 400 });
-    }
-
-    const participant = this.getParticipantByUserId(body.userId);
-    if (!participant) {
-      return Response.json({ error: "Not authorized to archive this session" }, { status: 403 });
+      // Body is optional now
     }
 
     const now = Date.now();
@@ -3093,7 +3084,7 @@ export class SessionDO extends DurableObject<Env> {
   /**
    * Handle unarchive session request.
    * Restores session status to "active" and broadcasts to all clients.
-   * Only session participants are authorized to unarchive.
+   * Any authenticated user can unarchive any session.
    */
   private async handleUnarchive(request: Request): Promise<Response> {
     const session = this.getSession();
@@ -3101,21 +3092,11 @@ export class SessionDO extends DurableObject<Env> {
       return Response.json({ error: "Session not found" }, { status: 404 });
     }
 
-    // Verify user is a participant (fail closed)
-    let body: { userId?: string };
+    // Parse body but don't require participant check
     try {
-      body = (await request.json()) as { userId?: string };
+      await request.json();
     } catch {
-      return Response.json({ error: "Invalid request body" }, { status: 400 });
-    }
-
-    if (!body.userId) {
-      return Response.json({ error: "userId is required" }, { status: 400 });
-    }
-
-    const participant = this.getParticipantByUserId(body.userId);
-    if (!participant) {
-      return Response.json({ error: "Not authorized to unarchive this session" }, { status: 403 });
+      // Body is optional now
     }
 
     const now = Date.now();

@@ -34,6 +34,7 @@ class SandboxSupervisor:
 
     # Configuration
     OPENCODE_PORT = 4096
+    CODESERVER_PORT = 8443
     HEALTH_CHECK_TIMEOUT = 30.0
     MAX_RESTARTS = 5
     BACKOFF_BASE = 2.0
@@ -42,6 +43,7 @@ class SandboxSupervisor:
     def __init__(self):
         self.opencode_process: asyncio.subprocess.Process | None = None
         self.bridge_process: asyncio.subprocess.Process | None = None
+        self.codeserver_process: asyncio.subprocess.Process | None = None
         self.shutdown_event = asyncio.Event()
         self.git_sync_complete = asyncio.Event()
         self.opencode_ready = asyncio.Event()
@@ -381,6 +383,44 @@ class SandboxSupervisor:
 
         raise RuntimeError("OpenCode server failed to become healthy")
 
+    async def start_codeserver(self) -> None:
+        """Start code-server for VS Code in browser."""
+        print("[supervisor] Starting code-server...")
+
+        # Determine working directory - use repo path if cloned, otherwise /workspace
+        workdir = self.workspace_path
+        if self.repo_path.exists() and (self.repo_path / ".git").exists():
+            workdir = self.repo_path
+
+        self.codeserver_process = await asyncio.create_subprocess_exec(
+            "code-server",
+            "--bind-addr",
+            f"0.0.0.0:{self.CODESERVER_PORT}",
+            "--auth",
+            "none",  # Modal tunnel provides security
+            "--disable-telemetry",
+            "--disable-update-check",
+            str(workdir),
+            env=os.environ,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT,
+        )
+
+        # Start log forwarder
+        asyncio.create_task(self._forward_codeserver_logs())
+        print(f"[supervisor] code-server started on port {self.CODESERVER_PORT}")
+
+    async def _forward_codeserver_logs(self) -> None:
+        """Forward code-server stdout to supervisor stdout."""
+        if not self.codeserver_process or not self.codeserver_process.stdout:
+            return
+
+        try:
+            async for line in self.codeserver_process.stdout:
+                print(f"[code-server] {line.decode().rstrip()}")
+        except Exception as e:
+            print(f"[supervisor] code-server log forwarding error: {e}")
+
     async def start_bridge(self) -> None:
         """Start the agent bridge process."""
         print("[supervisor] Starting bridge process...")
@@ -481,6 +521,12 @@ class SandboxSupervisor:
                 exit_code = self.bridge_process.returncode
                 print(f"[supervisor] Bridge exited (exit code: {exit_code}), restarting...")
                 await self.start_bridge()
+
+            # Check code-server process
+            if self.codeserver_process and self.codeserver_process.returncode is not None:
+                exit_code = self.codeserver_process.returncode
+                print(f"[supervisor] code-server exited (exit code: {exit_code}), restarting...")
+                await self.start_codeserver()
 
             await asyncio.sleep(1.0)
 
@@ -642,13 +688,16 @@ class SandboxSupervisor:
             # Phase 2: Configure git identity (if repo was cloned)
             await self.configure_git_identity()
 
-            # Phase 3: Start OpenCode server (in repo directory)
+            # Phase 3: Start code-server (VS Code in browser)
+            await self.start_codeserver()
+
+            # Phase 4: Start OpenCode server (in repo directory)
             await self.start_opencode()
 
-            # Phase 4: Start bridge (after OpenCode is ready)
+            # Phase 5: Start bridge (after OpenCode is ready)
             await self.start_bridge()
 
-            # Phase 5: Monitor processes
+            # Phase 6: Monitor processes
             print("[supervisor] Entering monitor_processes loop")
             await self.monitor_processes()
 
@@ -679,6 +728,15 @@ class SandboxSupervisor:
                 await asyncio.wait_for(self.bridge_process.wait(), timeout=5.0)
             except TimeoutError:
                 self.bridge_process.kill()
+
+        # Terminate code-server
+        if self.codeserver_process and self.codeserver_process.returncode is None:
+            print("[supervisor] Terminating code-server...")
+            self.codeserver_process.terminate()
+            try:
+                await asyncio.wait_for(self.codeserver_process.wait(), timeout=5.0)
+            except TimeoutError:
+                self.codeserver_process.kill()
 
         # Terminate OpenCode
         if self.opencode_process and self.opencode_process.returncode is None:

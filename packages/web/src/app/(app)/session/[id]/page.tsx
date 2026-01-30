@@ -6,8 +6,8 @@ import { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActionBar } from "@/components/action-bar";
 import { Composer, type PendingQuestion } from "@/components/composer";
 import type { QuestionInfo } from "@/components/question-card";
+import { MessageList, SessionHeader, SessionStatus } from "@/components/session";
 import { SessionRightSidebar } from "@/components/session-right-sidebar";
-import { SessionHeader, SessionStatus, MessageList } from "@/components/session";
 import { useRightPanelContext, useSidebarContext } from "@/components/sidebar-layout";
 import { HeaderSkeleton } from "@/components/ui/skeleton";
 import { SessionContext, useSessionSocket } from "@/hooks/use-session-socket";
@@ -291,7 +291,7 @@ function SessionContent() {
         <HeaderSkeleton />
       ) : (
         <SessionHeader
-          title={sessionState.title}
+          title={sessionState.title ?? "Untitled Session"}
           repoOwner={sessionState.repoOwner}
           repoName={sessionState.repoName}
           showSidebarToggle={!isOpen}

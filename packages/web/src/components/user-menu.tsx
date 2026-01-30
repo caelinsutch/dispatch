@@ -37,7 +37,11 @@ export function UserMenu() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button className="focus:outline-none" title={user.name || user.email || "User menu"}>
+        <button
+          type="button"
+          className="focus:outline-none"
+          title={user.name || user.email || "User menu"}
+        >
           <Avatar className="w-8 h-8 cursor-pointer hover:opacity-80 transition">
             {user.image && <AvatarImage src={user.image} alt={user.name || "Profile"} />}
             <AvatarFallback className="text-xs">{initials}</AvatarFallback>

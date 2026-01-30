@@ -23,8 +23,8 @@ SANDBOX_DIR = Path(__file__).parent.parent / "sandbox"
 OPENCODE_VERSION = "latest"
 
 # Cache buster - change this to force Modal image rebuild
-# v40: Fix question ID - capture from question.asked SSE event
-CACHE_BUSTER = "v40-fix-question-id"
+# v42: Add VS Code CLI for Remote Tunnels
+CACHE_BUSTER = "v42-add-vscode-tunnel"
 
 # Base image with all development tools
 base_image = (
@@ -96,6 +96,19 @@ base_image = (
     .run_commands(
         "playwright install chromium",
         "playwright install-deps chromium",
+    )
+    # Install code-server for VS Code in browser
+    .run_commands(
+        "curl -fsSL https://code-server.dev/install.sh | sh",
+        "code-server --version",
+    )
+    # Install VS Code CLI for Remote Tunnels (allows connecting local VS Code)
+    # Use the standalone CLI download from update.code.visualstudio.com
+    .run_commands(
+        "curl -L 'https://update.code.visualstudio.com/latest/cli-linux-x64/stable' -o /tmp/vscode_cli.tar.gz",
+        "tar -xzf /tmp/vscode_cli.tar.gz -C /usr/local/bin",
+        "rm /tmp/vscode_cli.tar.gz",
+        "code tunnel --version || echo 'VS Code CLI installed'",
     )
     # Create working directories
     .run_commands(

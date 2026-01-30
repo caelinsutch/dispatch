@@ -124,6 +124,7 @@ export function useSessionSocket(sessionId: string): UseSessionSocketReturn {
       participant?: { participantId: string; name: string; avatar?: string };
       isProcessing?: boolean;
       activePorts?: number[];
+      tunnelUrls?: Record<number, string>;
     }) => {
       switch (data.type) {
         case "subscribed":
@@ -256,6 +257,14 @@ export function useSessionSocket(sessionId: string): UseSessionSocketReturn {
 
         case "sandbox_ready":
           setSessionState((prev) => (prev ? { ...prev, sandboxStatus: "ready" } : null));
+          break;
+
+        case "tunnel_urls_updated":
+          if (data.tunnelUrls) {
+            setSessionState((prev) =>
+              prev ? { ...prev, tunnelUrls: data.tunnelUrls as Record<number, string> } : null
+            );
+          }
           break;
 
         case "artifact_created":

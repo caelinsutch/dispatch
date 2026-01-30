@@ -121,7 +121,7 @@ function ComposerRoot({
       setCustomInputs(new Map());
       setIsSubmitting(false);
     }
-  }, [pendingQuestion?.requestId]);
+  }, [pendingQuestion?.requestId, pendingQuestion]);
 
   const mode: ComposerMode = pendingQuestion ? "question" : "typing";
   const questionCount = pendingQuestion?.questions.length || 0;

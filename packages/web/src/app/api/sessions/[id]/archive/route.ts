@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "@/lib/auth";
 import { controlPlaneFetch } from "@/lib/control-plane";
 
-export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function POST(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession();
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

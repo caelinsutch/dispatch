@@ -17,7 +17,7 @@ function basename(filePath: string | undefined): string {
 function truncate(str: string | undefined, maxLen: number): string {
   if (!str) return "";
   if (str.length <= maxLen) return str;
-  return str.slice(0, maxLen) + "...";
+  return `${str.slice(0, maxLen)}...`;
 }
 
 /**

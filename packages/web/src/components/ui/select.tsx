@@ -2,7 +2,7 @@
 
 import { Select as SelectPrimitive } from "@base-ui-components/react/select";
 import { Check, ChevronDown, ChevronUp } from "lucide-react";
-import * as React from "react";
+import type * as React from "react";
 import { cn } from "@/lib/utils";
 
 const Select = SelectPrimitive.Root;
@@ -34,11 +34,7 @@ function SelectValue({
       {...props}
     >
       {(value) =>
-        value ? (
-          String(value)
-        ) : (
-          <span className="text-muted-foreground">{placeholder}</span>
-        )
+        value ? String(value) : <span className="text-muted-foreground">{placeholder}</span>
       }
     </SelectPrimitive.Value>
   );
@@ -147,10 +143,7 @@ function SelectItem({
   );
 }
 
-function SelectSeparator({
-  className,
-  ...props
-}: React.HTMLAttributes<HTMLDivElement>) {
+function SelectSeparator({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div
       data-slot="select-separator"

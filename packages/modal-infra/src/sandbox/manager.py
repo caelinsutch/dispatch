@@ -21,8 +21,10 @@ from ..images.base import base_image
 from .types import SandboxStatus, SessionConfig
 
 # Ports to expose via Modal Tunnel for live preview
-# Common dev server ports - tunnels are created at sandbox startup
-PREVIEW_PORTS = [3000, 3001, 5000, 5173, 8000, 8080]
+# 3000: Next.js, React, Express
+# 5173: Vite
+# 8443: code-server (VS Code in browser)
+PREVIEW_PORTS = [3000, 5173, 8443]
 
 
 @dataclass

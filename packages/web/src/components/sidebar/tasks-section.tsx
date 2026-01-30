@@ -48,7 +48,6 @@ function TaskStatusIcon({ status }: { status: Task["status"] }) {
           <CheckCircle className="h-4 w-4 text-success" />
         </span>
       );
-    case "pending":
     default:
       return (
         <span className="mt-0.5 flex-shrink-0">

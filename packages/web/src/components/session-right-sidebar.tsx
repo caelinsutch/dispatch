@@ -88,6 +88,7 @@ export function SessionRightSidebar({
             repoOwner={sessionState.repoOwner}
             repoName={sessionState.repoName}
             artifacts={artifacts}
+            tunnelUrls={sessionState.tunnelUrls}
           />
         </PanelContent>
       </Panel>

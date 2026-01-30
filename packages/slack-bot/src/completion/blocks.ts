@@ -51,7 +51,7 @@ export function buildCompletionBlocks(
       type: "section",
       text: {
         type: "mrkdwn",
-        text: "*Created:*\n" + response.artifacts.map((a) => `- <${a.url}|${a.label}>`).join("\n"),
+        text: `*Created:*\n${response.artifacts.map((a) => `- <${a.url}|${a.label}>`).join("\n")}`,
       },
     });
   }
@@ -112,7 +112,7 @@ function truncateForSlack(text: string, maxLen: number): string {
   const truncated = text.slice(0, maxLen);
   const lastPeriod = truncated.lastIndexOf(". ");
   if (lastPeriod > maxLen * 0.7) {
-    return truncated.slice(0, lastPeriod + 1) + "\n\n_...truncated_";
+    return `${truncated.slice(0, lastPeriod + 1)}\n\n_...truncated_`;
   }
-  return truncated + "...\n\n_...truncated_";
+  return `${truncated}...\n\n_...truncated_`;
 }

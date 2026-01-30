@@ -23,7 +23,7 @@ export async function verifySlackSignature(
 
   // Prevent replay attacks (5 minute window)
   const now = Math.floor(Date.now() / 1000);
-  if (Math.abs(now - parseInt(timestamp)) > 300) {
+  if (Math.abs(now - parseInt(timestamp, 10)) > 300) {
     return false;
   }
 
