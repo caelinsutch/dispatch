@@ -118,7 +118,6 @@ function ConversationContent({
   const { state, actions, meta } = useConversation();
 
   // Auto-scroll when new content is added (if at bottom)
-  // biome-ignore lint/correctness/useExhaustiveDependencies: children is intentionally a dependency to trigger auto-scroll when messages change
   useEffect(() => {
     if (autoScroll && state.isAtBottom) {
       actions.scrollToBottom();

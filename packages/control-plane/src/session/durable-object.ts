@@ -200,13 +200,6 @@ export class SessionDO extends DurableObject<Env> {
   }
 
   /**
-   * Normalize branch name for comparison to handle case and whitespace differences.
-   */
-  private normalizeBranchName(name: string): string {
-    return name.trim().toLowerCase();
-  }
-
-  /**
    * Initialize the session with required data.
    */
   private ensureInitialized(): void {
@@ -1868,7 +1861,7 @@ export class SessionDO extends DurableObject<Env> {
           result.tunnelUrls ? JSON.stringify(result.tunnelUrls) : null
         );
         console.log(
-          `[DO] Stored modal_object_id: ${result.modalObjectId}, tunnelUrls: ${result.tunnelUrls ? Object.keys(result.tunnelUrls).length + " ports" : "none"}`
+          `[DO] Stored modal_object_id: ${result.modalObjectId}, tunnelUrls: ${result.tunnelUrls ? `${Object.keys(result.tunnelUrls).length} ports` : "none"}`
         );
 
         // Broadcast tunnel URLs to connected clients
@@ -2682,7 +2675,7 @@ export class SessionDO extends DurableObject<Env> {
 
   private handleListEvents(url: URL): Response {
     const cursor = url.searchParams.get("cursor");
-    const limit = Math.min(parseInt(url.searchParams.get("limit") ?? "50"), 200);
+    const limit = Math.min(parseInt(url.searchParams.get("limit") ?? "50", 10), 200);
     const type = url.searchParams.get("type");
     const messageId = url.searchParams.get("message_id");
 
@@ -2706,7 +2699,7 @@ export class SessionDO extends DurableObject<Env> {
 
     if (cursor) {
       query += ` AND created_at < ?`;
-      params.push(parseInt(cursor));
+      params.push(parseInt(cursor, 10));
     }
 
     query += ` ORDER BY created_at DESC LIMIT ?`;
@@ -2748,7 +2741,7 @@ export class SessionDO extends DurableObject<Env> {
 
   private handleListMessages(url: URL): Response {
     const cursor = url.searchParams.get("cursor");
-    const limit = Math.min(parseInt(url.searchParams.get("limit") ?? "50"), 100);
+    const limit = Math.min(parseInt(url.searchParams.get("limit") ?? "50", 10), 100);
     const status = url.searchParams.get("status");
 
     // Validate status parameter if provided
@@ -2769,7 +2762,7 @@ export class SessionDO extends DurableObject<Env> {
 
     if (cursor) {
       query += ` AND created_at < ?`;
-      params.push(parseInt(cursor));
+      params.push(parseInt(cursor, 10));
     }
 
     query += ` ORDER BY created_at DESC LIMIT ?`;
@@ -2872,7 +2865,7 @@ export class SessionDO extends DurableObject<Env> {
       // Append session link footer to agent's PR body
       const webAppUrl = this.env.WEB_APP_URL || this.env.WORKER_URL || "";
       const sessionUrl = `${webAppUrl}/session/${sessionId}`;
-      const fullBody = body.body + `\n\n---\n*Created with [Dispatch](${sessionUrl})*`;
+      const fullBody = `${body.body}\n\n---\n*Created with [Dispatch](${sessionUrl})*`;
 
       // Create the PR using GitHub API (using the prompting user's token)
       const prResult = await createPullRequest(

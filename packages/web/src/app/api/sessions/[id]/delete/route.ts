@@ -4,7 +4,7 @@ import { getServerSession } from "@/lib/auth";
 import { controlPlaneFetch } from "@/lib/control-plane";
 
 export async function DELETE(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await getServerSession();

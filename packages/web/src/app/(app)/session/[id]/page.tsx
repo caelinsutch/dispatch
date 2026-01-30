@@ -13,7 +13,6 @@ import { SafeMarkdown } from "@/components/safe-markdown";
 import { SessionRightSidebar } from "@/components/session-right-sidebar";
 import { useRightPanelContext, useSidebarContext } from "@/components/sidebar-layout";
 import { ToolCallGroup } from "@/components/tool-call-group";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { HeaderSkeleton, MessageListSkeleton } from "@/components/ui/skeleton";
 import { SessionContext, useSessionSocket } from "@/hooks/use-session-socket";
 import { useSessionsContext } from "@/hooks/use-sessions";
@@ -369,7 +368,7 @@ function SessionContent() {
   }, [events, answeredQuestions]);
 
   // Archive handlers (still REST for now - session mutations)
-  const handleArchive = useCallback(async () => {
+  const _handleArchive = useCallback(async () => {
     if (!sessionState?.id) return;
     try {
       const response = await fetch(`/api/sessions/${sessionState.id}/archive`, { method: "POST" });
@@ -379,7 +378,7 @@ function SessionContent() {
     }
   }, [sessionState?.id]);
 
-  const handleUnarchive = useCallback(async () => {
+  const _handleUnarchive = useCallback(async () => {
     if (!sessionState?.id) return;
     try {
       const response = await fetch(`/api/sessions/${sessionState.id}/unarchive`, {
@@ -465,27 +464,28 @@ function SessionContent() {
         <HeaderSkeleton />
       ) : (
         <header className="h-12 px-4 flex items-center justify-between border-b border-border-muted flex-shrink-0">
-            <div className="flex items-center gap-3">
-              {!isOpen && (
-                <button
-                  onClick={toggle}
-                  className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted transition"
-                  title="Open sidebar"
-                >
-                  <PanelLeft className="h-4 w-4" />
-                </button>
-              )}
-              <div>
-                <h1 className="text-sm font-medium text-foreground">
-                  {sessionState.title || `${sessionState.repoOwner}/${sessionState.repoName}`}
-                </h1>
-              </div>
+          <div className="flex items-center gap-3">
+            {!isOpen && (
+              <button
+                type="button"
+                onClick={toggle}
+                className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted transition"
+                title="Open sidebar"
+              >
+                <PanelLeft className="h-4 w-4" />
+              </button>
+            )}
+            <div>
+              <h1 className="text-sm font-medium text-foreground">
+                {sessionState.title || `${sessionState.repoOwner}/${sessionState.repoName}`}
+              </h1>
             </div>
-            <SessionStatus
-              connected={connected}
-              connecting={connecting}
-              sandboxStatus={sessionState.sandboxStatus}
-            />
+          </div>
+          <SessionStatus
+            connected={connected}
+            connecting={connecting}
+            sandboxStatus={sessionState.sandboxStatus}
+          />
         </header>
       )}
 
@@ -494,6 +494,7 @@ function SessionContent() {
         <div className="bg-red-50 dark:bg-red-900/20 border-b border-red-200 dark:border-red-800 px-4 py-3 flex items-center justify-between">
           <p className="text-sm text-red-700 dark:text-red-400">{authError || connectionError}</p>
           <button
+            type="button"
             onClick={reconnect}
             className="px-3 py-1.5 text-sm font-medium text-white bg-red-600 hover:bg-red-700 transition"
           >
@@ -758,7 +759,7 @@ function ThinkingIndicator() {
 
 function EventItem({
   event,
-  currentParticipantId,
+  currentParticipantId: _currentParticipantId,
   chainStartTime,
   chainEndTime,
   chainIsComplete,
@@ -846,7 +847,15 @@ function EventItem({
       if (!event.error) return null;
       return (
         <div className="flex items-center gap-2 text-sm text-red-600 dark:text-red-400 py-1">
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg
+            className="w-4 h-4"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            role="img"
+            aria-label="Error"
+          >
+            <title>Error</title>
             <path
               strokeLinecap="round"
               strokeLinejoin="round"

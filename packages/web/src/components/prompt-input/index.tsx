@@ -130,7 +130,6 @@ function PromptInputTextarea({
   const { state, actions, meta } = usePromptInput();
 
   // Auto-resize textarea
-  // biome-ignore lint/correctness/useExhaustiveDependencies: state.value is intentionally a dependency to trigger resize when text changes
   useEffect(() => {
     const textarea = meta.textareaRef.current;
     if (textarea) {

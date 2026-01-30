@@ -30,7 +30,7 @@ async function getAuthHeaders(env: Env): Promise<Record<string, string>> {
 
   if (env.INTERNAL_CALLBACK_SECRET) {
     const authToken = await generateInternalToken(env.INTERNAL_CALLBACK_SECRET);
-    headers["Authorization"] = `Bearer ${authToken}`;
+    headers.Authorization = `Bearer ${authToken}`;
   }
 
   return headers;

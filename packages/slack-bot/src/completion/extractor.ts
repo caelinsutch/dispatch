@@ -38,7 +38,7 @@ export async function extractAgentResponse(
     };
     if (env.INTERNAL_CALLBACK_SECRET) {
       const authToken = await generateInternalToken(env.INTERNAL_CALLBACK_SECRET);
-      headers["Authorization"] = `Bearer ${authToken}`;
+      headers.Authorization = `Bearer ${authToken}`;
     }
 
     // Fetch all events for this message, paginating if necessary

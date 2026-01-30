@@ -53,7 +53,7 @@ export function formatModelNameShort(modelId: string): string {
 export function truncateBranch(branchName: string, maxLength = 30): string {
   if (!branchName) return "";
   if (branchName.length <= maxLength) return branchName;
-  return "..." + branchName.slice(-maxLength);
+  return `...${branchName.slice(-maxLength)}`;
 }
 
 /**
@@ -99,7 +99,7 @@ export function formatFilePath(
   }
 
   return {
-    display: basename.slice(0, maxLength - 3) + "...",
+    display: `${basename.slice(0, maxLength - 3)}...`,
     full: filePath,
   };
 }

@@ -80,7 +80,7 @@ export async function verifyInternalToken(
   // Reject tokens outside the validity window
   const tokenTime = parseInt(timestamp, 10);
   const now = Date.now();
-  if (isNaN(tokenTime) || Math.abs(now - tokenTime) > TOKEN_VALIDITY_MS) {
+  if (Number.isNaN(tokenTime) || Math.abs(now - tokenTime) > TOKEN_VALIDITY_MS) {
     return false;
   }
 

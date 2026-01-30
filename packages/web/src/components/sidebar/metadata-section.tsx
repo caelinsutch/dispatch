@@ -75,7 +75,6 @@ export function MetadataSection({
         return "destructive";
       case "draft":
         return "secondary";
-      case "open":
       default:
         return "outline";
     }
@@ -177,9 +176,7 @@ export function MetadataSection({
             >
               <PopoverHeader>
                 <PopoverTitle>VS Code Options</PopoverTitle>
-                <PopoverDescription>
-                  Choose how to edit code in this session
-                </PopoverDescription>
+                <PopoverDescription>Choose how to edit code in this session</PopoverDescription>
               </PopoverHeader>
               <div className="space-y-3 pt-1">
                 <div className="animate-in fade-in-0 slide-in-from-left-1 duration-300 delay-75">

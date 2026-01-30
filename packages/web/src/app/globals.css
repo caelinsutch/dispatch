@@ -204,8 +204,8 @@ body {
 
 /* Override base-ui default highlight colors */
 [data-highlighted] {
-  background-color: hsl(var(--accent)) !important;
-  color: hsl(var(--accent-foreground)) !important;
+  background-color: hsl(var(--accent));
+  color: hsl(var(--accent-foreground));
 }
 
 

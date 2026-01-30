@@ -14,7 +14,8 @@
       "!**/.next",
       "!**/.open-next",
       "!**/.wrangler",
-      "!**/packages/modal-infra"
+      "!**/packages/modal-infra",
+      "!**/*.css"
     ]
   },
   "formatter": {
@@ -30,14 +31,20 @@
       "recommended": true,
       "correctness": {
         "noUnusedImports": "error",
-        "noUnusedVariables": "warn"
+        "noUnusedVariables": "warn",
+        "useExhaustiveDependencies": "off"
       },
       "style": {
         "noNonNullAssertion": "off",
         "useImportType": "error"
       },
       "suspicious": {
-        "noExplicitAny": "off"
+        "noExplicitAny": "off",
+        "noArrayIndexKey": "warn"
+      },
+      "a11y": {
+        "noSvgWithoutTitle": "warn",
+        "useSemanticElements": "warn"
       }
     }
   },

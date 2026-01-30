@@ -300,7 +300,7 @@ function SessionListItem({ session, isActive }: { session: SessionItem; isActive
   // Display title (matching the session page header)
   const titleDisplay = session.title || `${session.repoOwner}/${session.repoName}`;
   const truncatedTitle =
-    titleDisplay.length > 25 ? titleDisplay.slice(0, 25) + "..." : titleDisplay;
+    titleDisplay.length > 25 ? `${titleDisplay.slice(0, 25)}...` : titleDisplay;
 
   // Diff stats from actual file changes (synced when viewing session)
   const additions = session.additions ?? 0;

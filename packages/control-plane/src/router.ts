@@ -365,7 +365,7 @@ async function handleListSessions(
   _match: RegExpMatchArray
 ): Promise<Response> {
   const url = new URL(request.url);
-  const limit = Math.min(parseInt(url.searchParams.get("limit") || "50"), 100);
+  const limit = Math.min(parseInt(url.searchParams.get("limit") || "50", 10), 100);
   const cursor = url.searchParams.get("cursor") || undefined;
 
   // List sessions from KV index
@@ -486,7 +486,7 @@ async function handleCreateSession(
 }
 
 async function handleGetSession(
-  request: Request,
+  _request: Request,
   env: Env,
   match: RegExpMatchArray
 ): Promise<Response> {
@@ -530,7 +530,7 @@ async function handleGetSession(
 }
 
 async function handleDeleteSession(
-  request: Request,
+  _request: Request,
   env: Env,
   match: RegExpMatchArray
 ): Promise<Response> {
@@ -920,7 +920,7 @@ interface CachedReposList {
  * Results are cached in KV for 5 minutes to avoid rate limits.
  */
 async function handleListRepos(
-  request: Request,
+  _request: Request,
   env: Env,
   _match: RegExpMatchArray
 ): Promise<Response> {
@@ -1060,7 +1060,7 @@ async function handleUpdateRepoMetadata(
  * Get metadata for a specific repository.
  */
 async function handleGetRepoMetadata(
-  request: Request,
+  _request: Request,
   env: Env,
   match: RegExpMatchArray
 ): Promise<Response> {
