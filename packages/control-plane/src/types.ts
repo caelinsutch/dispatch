@@ -103,12 +103,14 @@ export type ServerMessage =
   | { type: "presence_sync"; participants: ParticipantPresence[] }
   | { type: "presence_update"; participants: ParticipantPresence[] }
   | { type: "presence_leave"; userId: string }
-  | { type: "sandbox_warming" }
+  | { type: "sandbox_warming"; message?: string }
   | { type: "sandbox_spawning" }
   | { type: "sandbox_status"; status: string }
   | { type: "sandbox_ready" }
   | { type: "sandbox_error"; error: string }
   | { type: "error"; code: string; message: string }
+  | { type: "question_answer_queued"; requestId: string; message: string }
+  | { type: "question_answer_error"; requestId: string; error: string }
   | {
       type: "artifact_created";
       artifact: { id: string; type: string; url: string; prNumber?: number };

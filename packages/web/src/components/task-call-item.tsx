@@ -65,16 +65,6 @@ export function TaskCallItem({ event, isExpanded, onToggle }: TaskCallItemProps)
   // Get nested tool calls from metadata.summary (populated by OpenCode Task tool)
   const nestedTools = (event.metadata?.summary || []) as ToolCallSummary[];
 
-  // DEBUG: Log Task event data
-  console.log("[TaskCallItem] Event:", {
-    tool: event.tool,
-    status: event.status,
-    hasMetadata: !!event.metadata,
-    metadata: event.metadata,
-    nestedToolsCount: nestedTools.length,
-    args: event.args,
-  });
-
   return (
     <div className="w-full">
       {/* Agent header */}

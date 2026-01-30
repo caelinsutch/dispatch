@@ -289,13 +289,6 @@ class AgentBridge:
         event["sandboxId"] = self.sandbox_id
         event["timestamp"] = event.get("timestamp", time.time())
 
-        # DEBUG: Log full event for task tool_calls
-        if event_type == "tool_call" and event.get("tool", "").lower() == "task":
-            print(f"[bridge] DEBUG SENDING TASK EVENT - has metadata: {'metadata' in event}")
-            print(f"[bridge] DEBUG SENDING TASK EVENT - event keys: {list(event.keys())}")
-            if "metadata" in event:
-                print(f"[bridge] DEBUG SENDING TASK EVENT - metadata: {event['metadata']}")
-
         try:
             await self.ws.send(json.dumps(event))
             print(f"[bridge] Sent event: {event_type}")
@@ -498,21 +491,6 @@ class AgentBridge:
             output = state.get("output", "")
             metadata = state.get("metadata", {})
 
-            print(f"[bridge] TRACE: tool_name='{tool_name}', lower='{tool_name.lower()}', is_task={tool_name.lower() == 'task'}")
-
-            # DEBUG: Log Task tool metadata for nested tool calls
-            if tool_name.lower() == "task":
-                import json
-                print(f"[bridge] DEBUG TASK TOOL - status={status}, state keys: {list(state.keys())}")
-                print(f"[bridge] DEBUG TASK TOOL - metadata: {metadata}")
-                if metadata:
-                    print(f"[bridge] DEBUG TASK TOOL - metadata.summary: {metadata.get('summary')}")
-                    print(f"[bridge] DEBUG TASK TOOL - metadata.sessionId: {metadata.get('sessionId')}")
-                else:
-                    print(f"[bridge] DEBUG TASK TOOL - NO METADATA in state")
-                print(f"[bridge] DEBUG TASK TOOL - Full state (truncated):")
-                print(json.dumps(state, indent=2, default=str)[:3000])
-
             # Scan Bash tool outputs for localhost URLs (for live preview)
             if tool_name == "Bash" and output:
                 self._scan_for_ports(output, message_id)
@@ -530,9 +508,6 @@ class AgentBridge:
             # Include metadata for tools that have it (e.g., Task tool summary)
             if metadata:
                 event["metadata"] = metadata
-                if tool_name.lower() == "task":
-                    print(f"[bridge] DEBUG TASK EVENT - Added metadata to event, event keys: {list(event.keys())}")
-                    print(f"[bridge] DEBUG TASK EVENT - event.metadata: {event.get('metadata')}")
 
             return event
         elif part_type == "step-finish":

@@ -1392,9 +1392,14 @@ export class SessionDO extends DurableObject<Env> {
 
     // Track pending questions to prevent inactivity timeout while waiting for user response
     if (event.type === "tool_call" && event.callId) {
-      // AskUserQuestion, Question, or similar question tools
+      // Explicit allowlist of question tool names (case-insensitive)
       const toolName = event.tool?.toLowerCase() || "";
-      if (toolName.includes("question") || toolName === "askuserquestion") {
+      const questionTools = [
+        "question",
+        "askuserquestion",
+        "mcp__conductor__askuserquestion",
+      ];
+      if (questionTools.includes(toolName)) {
         console.log(`[DO] Question tool invoked, tracking pending question: ${event.callId}`);
         this.pendingQuestionRequestIds.add(event.callId);
       }
