@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, use, useCallback, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import type { SessionItem } from "@/components/session-sidebar";
 
 interface SessionsContextValue {
@@ -44,10 +45,12 @@ export function SessionsProvider({ children, isAuthenticated }: SessionsProvider
         setSessions(data.sessions || []);
       } else {
         setError("Failed to fetch sessions");
+        toast.error("Failed to load sessions");
       }
     } catch (err) {
       console.error("Failed to fetch sessions:", err);
       setError("Failed to fetch sessions");
+      toast.error("Failed to load sessions");
     } finally {
       setIsLoading(false);
     }
@@ -76,11 +79,14 @@ export function SessionsProvider({ children, isAuthenticated }: SessionsProvider
       if (res.ok) {
         // Update local state
         setSessions((prev) => prev.map((s) => (s.id === id ? { ...s, status: "archived" } : s)));
+        toast.success("Session archived");
         return true;
       }
+      toast.error("Failed to archive session");
       return false;
     } catch (err) {
       console.error("Failed to archive session:", err);
+      toast.error("Failed to archive session");
       return false;
     }
   }, []);
@@ -91,11 +97,14 @@ export function SessionsProvider({ children, isAuthenticated }: SessionsProvider
       if (res.ok) {
         // Update local state
         setSessions((prev) => prev.map((s) => (s.id === id ? { ...s, status: "active" } : s)));
+        toast.success("Session restored");
         return true;
       }
+      toast.error("Failed to restore session");
       return false;
     } catch (err) {
       console.error("Failed to unarchive session:", err);
+      toast.error("Failed to restore session");
       return false;
     }
   }, []);
@@ -106,11 +115,14 @@ export function SessionsProvider({ children, isAuthenticated }: SessionsProvider
       if (res.ok) {
         // Remove from local state
         setSessions((prev) => prev.filter((s) => s.id !== id));
+        toast.success("Session deleted");
         return true;
       }
+      toast.error("Failed to delete session");
       return false;
     } catch (err) {
       console.error("Failed to delete session:", err);
+      toast.error("Failed to delete session");
       return false;
     }
   }, []);

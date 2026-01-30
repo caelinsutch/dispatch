@@ -4,6 +4,7 @@ import { DEFAULT_MODEL } from "@dispatch/shared";
 import { PanelLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { useSidebarContext } from "@/components/sidebar-layout";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -43,9 +44,12 @@ export default function NewSessionPage() {
       if (res.ok) {
         const data = (await res.json()) as { repos?: typeof repos };
         setRepos(data.repos || []);
+      } else {
+        toast.error("Failed to load repositories");
       }
     } catch (error) {
       console.error("Failed to fetch repos:", error);
+      toast.error("Failed to load repositories");
     } finally {
       setLoading(false);
     }
@@ -82,13 +86,17 @@ export default function NewSessionPage() {
 
       if (res.ok) {
         const data = (await res.json()) as { sessionId: string };
+        toast.success("Session created");
         router.push(`/session/${data.sessionId}`);
       } else {
         const data = (await res.json()) as { error?: string };
-        setError(data.error || "Failed to create session");
+        const errorMsg = data.error || "Failed to create session";
+        setError(errorMsg);
+        toast.error(errorMsg);
       }
     } catch (_error) {
       setError("Failed to create session");
+      toast.error("Failed to create session");
     } finally {
       setCreating(false);
     }

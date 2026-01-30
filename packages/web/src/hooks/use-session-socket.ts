@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 import type { Artifact, FileChange, SandboxEvent } from "@/types/session";
 
 // WebSocket URL (should come from env in production)
@@ -300,6 +301,9 @@ export function useSessionSocket(sessionId: string): UseSessionSocketReturn {
         case "sandbox_error":
           console.error("Sandbox error:", data.error);
           setSessionState((prev) => (prev ? { ...prev, sandboxStatus: "failed" } : null));
+          toast.error("Sandbox failed to start", {
+            description: data.error || "Please try again",
+          });
           break;
 
         case "pong":
@@ -322,7 +326,9 @@ export function useSessionSocket(sessionId: string): UseSessionSocketReturn {
 
         case "question_answer_error":
           console.error("Question answer error:", data);
-          // TODO: Could emit an event or update state to show error in UI
+          toast.error("Failed to submit answer", {
+            description: data.error || "Please try again",
+          });
           break;
       }
     },
@@ -442,6 +448,9 @@ export function useSessionSocket(sessionId: string): UseSessionSocketReturn {
       // Handle authentication errors
       if (event.code === WS_CLOSE_AUTH_REQUIRED) {
         setAuthError("Authentication failed. Please sign in again.");
+        toast.error("Authentication failed", {
+          description: "Please sign in again",
+        });
         // Clear the token so we fetch a new one on reconnect
         wsTokenRef.current = null;
         return;
@@ -450,6 +459,9 @@ export function useSessionSocket(sessionId: string): UseSessionSocketReturn {
       // Handle session expired (e.g., after server hibernation)
       if (event.code === WS_CLOSE_SESSION_EXPIRED) {
         setConnectionError("Session expired. Please reconnect.");
+        toast.error("Session expired", {
+          description: "Please reconnect to continue",
+        });
         wsTokenRef.current = null;
         return;
       }
@@ -470,18 +482,27 @@ export function useSessionSocket(sessionId: string): UseSessionSocketReturn {
           // Exhausted reconnection attempts
           console.error("WebSocket reconnection failed after 5 attempts");
           setConnectionError("Connection lost. Please check your network and try reconnecting.");
+          toast.error("Connection lost", {
+            description: "Please check your network and try reconnecting",
+          });
         }
       }
     };
 
     ws.onerror = (error) => {
       console.error("WebSocket error event:", error);
+      toast.error("Connection error", {
+        description: "There was a problem connecting to the session",
+      });
     };
   }, [sessionId, handleMessage, fetchWsToken, flushPendingText]);
 
   const sendPrompt = useCallback((content: string, model?: string) => {
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
       console.error("WebSocket not connected");
+      toast.error("Not connected", {
+        description: "Please wait for the connection to establish",
+      });
       return;
     }
 
@@ -528,6 +549,9 @@ export function useSessionSocket(sessionId: string): UseSessionSocketReturn {
   const sendQuestionAnswer = useCallback((requestId: string, answers: string[][]) => {
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
       console.error("WebSocket not connected, cannot send question answer");
+      toast.error("Not connected", {
+        description: "Cannot submit answer while disconnected",
+      });
       return;
     }
     wsRef.current.send(

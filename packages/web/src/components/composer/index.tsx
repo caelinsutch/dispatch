@@ -1,18 +1,10 @@
 "use client";
 
 import { ArrowUp, Brain, ChevronLeft, ChevronRight, Map as MapIcon, Plus, X } from "lucide-react";
-import {
-  createContext,
-  use,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
-import { cn } from "@/lib/utils";
+import { createContext, use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { QuestionInfo } from "@/components/question-card";
 import { Toggle } from "@/components/ui/toggle";
+import { cn } from "@/lib/utils";
 
 // Claude icon SVG path
 const ClaudeIcon = ({ className }: { className?: string }) => (
@@ -142,26 +134,29 @@ function ComposerRoot({
   }, [prompt, disabled, isProcessing, onSubmitPrompt]);
 
   // Question actions
-  const selectOption = useCallback((questionIndex: number, optionIndex: number) => {
-    setSelections((prev) => {
-      const newSelections = new Map(prev);
-      const current = new Set<string>();
-      if (pendingQuestion?.questions[questionIndex]) {
-        const opt = pendingQuestion.questions[questionIndex].options[optionIndex];
-        if (opt) {
-          current.add(opt.label);
+  const selectOption = useCallback(
+    (questionIndex: number, optionIndex: number) => {
+      setSelections((prev) => {
+        const newSelections = new Map(prev);
+        const current = new Set<string>();
+        if (pendingQuestion?.questions[questionIndex]) {
+          const opt = pendingQuestion.questions[questionIndex].options[optionIndex];
+          if (opt) {
+            current.add(opt.label);
+          }
         }
-      }
-      newSelections.set(questionIndex, current);
-      return newSelections;
-    });
-    // Clear custom input when selecting an option
-    setCustomInputs((prev) => {
-      const newInputs = new Map(prev);
-      newInputs.delete(questionIndex);
-      return newInputs;
-    });
-  }, [pendingQuestion]);
+        newSelections.set(questionIndex, current);
+        return newSelections;
+      });
+      // Clear custom input when selecting an option
+      setCustomInputs((prev) => {
+        const newInputs = new Map(prev);
+        newInputs.delete(questionIndex);
+        return newInputs;
+      });
+    },
+    [pendingQuestion]
+  );
 
   const setCustomInputValue = useCallback((questionIndex: number, value: string) => {
     setCustomInputs((prev) => new Map(prev).set(questionIndex, value));
@@ -440,7 +435,8 @@ function QuestionContent({ className }: { className?: string }) {
                 onClick={() => actions.navigateQuestion(idx)}
                 className={cn(
                   "w-2 h-2 rounded-full transition-colors cursor-pointer hover:opacity-70 border !border-muted-foreground bg-transparent",
-                  idx === state.currentQuestionIndex && "ring-1 ring-ring ring-offset-1 ring-offset-background"
+                  idx === state.currentQuestionIndex &&
+                    "ring-1 ring-ring ring-offset-1 ring-offset-background"
                 )}
               />
             ))}
@@ -497,7 +493,10 @@ interface FooterProps {
 function Footer({ children, className }: FooterProps) {
   return (
     <div
-      className={cn("flex items-center justify-between px-4 py-2 border-t border-border-muted", className)}
+      className={cn(
+        "flex items-center justify-between px-4 py-2 border-t border-border-muted",
+        className
+      )}
     >
       {children}
     </div>
@@ -559,17 +558,11 @@ function ToolbarLeft({
         aria-label="Toggle thinking mode"
       >
         <Brain strokeWidth={1.5} />
-        {thinkingEnabled && (
-          <span className="text-xs font-medium whitespace-nowrap">Thinking</span>
-        )}
+        {thinkingEnabled && <span className="text-xs font-medium whitespace-nowrap">Thinking</span>}
       </Toggle>
 
       {/* Plan toggle */}
-      <Toggle
-        pressed={planEnabled}
-        onPressedChange={onPlanToggle}
-        aria-label="Toggle plan mode"
-      >
+      <Toggle pressed={planEnabled} onPressedChange={onPlanToggle} aria-label="Toggle plan mode">
         <MapIcon strokeWidth={1.5} />
       </Toggle>
     </div>
@@ -589,7 +582,12 @@ function ToolbarRight({ onAddClick, onStop, className }: ToolbarRightProps) {
   if (state.mode === "question") return null;
 
   return (
-    <div className={cn("absolute bottom-3 right-3 flex items-center gap-2 flex-shrink-0 h-7", className)}>
+    <div
+      className={cn(
+        "absolute bottom-3 right-3 flex items-center gap-2 flex-shrink-0 h-7",
+        className
+      )}
+    >
       {meta.isProcessing && state.prompt.trim() && (
         <span className="text-xs text-amber-600 dark:text-amber-400">Waiting...</span>
       )}
