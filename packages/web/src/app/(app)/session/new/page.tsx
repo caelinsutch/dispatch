@@ -137,7 +137,7 @@ export default function NewSessionPage() {
                 id="repo-select"
                 value={selectedRepo}
                 onChange={(e) => setSelectedRepo(e.target.value)}
-                className="w-full px-4 py-3 border border-border bg-input text-foreground focus:outline-none focus:ring-2 focus:ring-ring rounded-md"
+                className="w-full px-4 py-3 border border-border bg-input text-foreground focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 rounded-md"
                 required
               >
                 <option value="">Select a repository...</option>

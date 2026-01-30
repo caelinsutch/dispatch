@@ -1,7 +1,7 @@
 "use client";
 
-import { createContext, useCallback, useEffect, useRef, useState } from "react";
-import type { Artifact, SandboxEvent } from "@/types/session";
+import { createContext, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { Artifact, FileChange, SandboxEvent } from "@/types/session";
 
 // WebSocket URL (should come from env in production)
 const WS_URL = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8787";
@@ -44,6 +44,7 @@ export interface UseSessionSocketReturn {
   events: SandboxEvent[];
   participants: Participant[];
   artifacts: Artifact[];
+  filesChanged: FileChange[];
   currentParticipantId: string | null;
   isProcessing: boolean;
   sendPrompt: (content: string, model?: string) => void;
@@ -304,6 +305,11 @@ export function useSessionSocket(sessionId: string): UseSessionSocketReturn {
 
         case "error":
           console.error("Session error:", data);
+          break;
+
+        case "history_complete":
+          // Historical events have been sent - flush any accumulated text
+          flushPendingText();
           break;
 
         case "question_answer_queued":
@@ -581,6 +587,49 @@ export function useSessionSocket(sessionId: string): UseSessionSocketReturn {
 
   const isProcessing = sessionState?.isProcessing ?? false;
 
+  // Compute files changed from Edit/Write tool calls
+  const filesChanged = useMemo(() => {
+    const fileMap = new Map<string, FileChange>();
+
+    for (const event of events) {
+      if (event.type === "tool_call" && event.status === "completed") {
+        const tool = event.tool;
+        const args = event.args;
+
+        if ((tool === "Edit" || tool === "Write") && args?.file_path) {
+          const filePath = String(args.file_path);
+          const existing = fileMap.get(filePath);
+
+          // Estimate additions/deletions from the content
+          let additions = 0;
+          let deletions = 0;
+
+          if (tool === "Edit" && args.old_string && args.new_string) {
+            const oldLines = String(args.old_string).split("\n").length;
+            const newLines = String(args.new_string).split("\n").length;
+            additions = Math.max(0, newLines - oldLines) || 1;
+            deletions = Math.max(0, oldLines - newLines) || 0;
+          } else if (tool === "Write" && args.content) {
+            additions = String(args.content).split("\n").length;
+          }
+
+          if (existing) {
+            existing.additions += additions;
+            existing.deletions += deletions;
+          } else {
+            fileMap.set(filePath, {
+              filename: filePath,
+              additions,
+              deletions,
+            });
+          }
+        }
+      }
+    }
+
+    return Array.from(fileMap.values());
+  }, [events]);
+
   return {
     connected,
     connecting,
@@ -590,6 +639,7 @@ export function useSessionSocket(sessionId: string): UseSessionSocketReturn {
     events,
     participants,
     artifacts,
+    filesChanged,
     currentParticipantId,
     isProcessing,
     sendPrompt,

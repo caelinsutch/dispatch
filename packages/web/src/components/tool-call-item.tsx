@@ -1,57 +1,14 @@
 "use client";
 
-import {
-  Brain,
-  FileSearch,
-  FileText,
-  Globe,
-  HelpCircle,
-  ListTodo,
-  Minus,
-  Pencil,
-  Plus,
-  Search,
-  Terminal,
-  Zap,
-} from "lucide-react";
+import { Minus, Plus } from "lucide-react";
 import type { SandboxEvent } from "@/lib/tool-formatters";
 import { formatToolCall } from "@/lib/tool-formatters";
+import { getIconByName } from "@/lib/tool-icons";
 
 interface ToolCallItemProps {
   event: SandboxEvent;
   isExpanded: boolean;
   onToggle: () => void;
-}
-
-function ToolIcon({ name }: { name: string | null }) {
-  if (!name) return null;
-
-  const iconClass = "size-3 text-muted-foreground";
-
-  switch (name) {
-    case "file":
-      return <FileText className={iconClass} />;
-    case "pencil":
-      return <Pencil className={iconClass} />;
-    case "plus":
-      return <Plus className={iconClass} />;
-    case "terminal":
-      return <Terminal className={iconClass} />;
-    case "search":
-      return <Search className={iconClass} />;
-    case "filesearch":
-      return <FileSearch className={iconClass} />;
-    case "globe":
-      return <Globe className={iconClass} />;
-    case "question":
-      return <HelpCircle className={iconClass} />;
-    case "brain":
-      return <Brain className={iconClass} />;
-    case "list":
-      return <ListTodo className={iconClass} />;
-    default:
-      return <Zap className={iconClass} />;
-  }
 }
 
 export function ToolCallItem({ event, isExpanded, onToggle }: ToolCallItemProps) {
@@ -74,7 +31,7 @@ export function ToolCallItem({ event, isExpanded, onToggle }: ToolCallItemProps)
             <>
               <Plus className="size-3 text-muted-foreground hidden group-hover/collapsible:block" />
               <div className="group-hover/collapsible:hidden">
-                <ToolIcon name={formatted.icon} />
+                {getIconByName(formatted.icon, "xs", "text-muted-foreground")}
               </div>
             </>
           )}

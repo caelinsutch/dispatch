@@ -118,7 +118,8 @@ export type ServerMessage =
   | { type: "sandbox_warning"; message: string }
   | { type: "session_status"; status: SessionStatus }
   | { type: "processing_status"; isProcessing: boolean }
-  | { type: "active_ports_updated"; activePorts: number[] };
+  | { type: "active_ports_updated"; activePorts: number[] }
+  | { type: "history_complete" };
 
 // Sandbox events (from Modal)
 export type SandboxEvent =

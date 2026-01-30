@@ -42,11 +42,7 @@ export interface PanelHeaderProps extends React.HTMLAttributes<HTMLDivElement> {
 const PanelHeader = forwardRef<HTMLDivElement, PanelHeaderProps>(
   ({ className, children, ...props }, ref) => {
     return (
-      <div
-        ref={ref}
-        className={cn("flex items-center justify-between pb-3", className)}
-        {...props}
-      >
+      <div ref={ref} className={cn("flex items-center justify-between pb-3", className)} {...props}>
         {children}
       </div>
     );

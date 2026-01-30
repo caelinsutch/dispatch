@@ -8,6 +8,7 @@ interface SessionsContextValue {
   isLoading: boolean;
   error: string | null;
   refresh: () => Promise<void>;
+  updateSession: (id: string, updates: Partial<SessionItem>) => void;
   archiveSession: (id: string) => Promise<boolean>;
   unarchiveSession: (id: string) => Promise<boolean>;
   deleteSession: (id: string) => Promise<boolean>;
@@ -65,14 +66,16 @@ export function SessionsProvider({ children, isAuthenticated }: SessionsProvider
     await fetchSessions();
   }, [fetchSessions]);
 
+  const updateSession = useCallback((id: string, updates: Partial<SessionItem>) => {
+    setSessions((prev) => prev.map((s) => (s.id === id ? { ...s, ...updates } : s)));
+  }, []);
+
   const archiveSession = useCallback(async (id: string): Promise<boolean> => {
     try {
       const res = await fetch(`/api/sessions/${id}/archive`, { method: "POST" });
       if (res.ok) {
         // Update local state
-        setSessions((prev) =>
-          prev.map((s) => (s.id === id ? { ...s, status: "archived" } : s))
-        );
+        setSessions((prev) => prev.map((s) => (s.id === id ? { ...s, status: "archived" } : s)));
         return true;
       }
       return false;
@@ -87,9 +90,7 @@ export function SessionsProvider({ children, isAuthenticated }: SessionsProvider
       const res = await fetch(`/api/sessions/${id}/unarchive`, { method: "POST" });
       if (res.ok) {
         // Update local state
-        setSessions((prev) =>
-          prev.map((s) => (s.id === id ? { ...s, status: "active" } : s))
-        );
+        setSessions((prev) => prev.map((s) => (s.id === id ? { ...s, status: "active" } : s)));
         return true;
       }
       return false;
@@ -115,7 +116,18 @@ export function SessionsProvider({ children, isAuthenticated }: SessionsProvider
   }, []);
 
   return (
-    <SessionsContext value={{ sessions, isLoading, error, refresh, archiveSession, unarchiveSession, deleteSession }}>
+    <SessionsContext
+      value={{
+        sessions,
+        isLoading,
+        error,
+        refresh,
+        updateSession,
+        archiveSession,
+        unarchiveSession,
+        deleteSession,
+      }}
+    >
       {children}
     </SessionsContext>
   );

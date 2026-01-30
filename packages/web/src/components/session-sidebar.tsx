@@ -24,8 +24,8 @@ import {
 } from "@/components/ui/context-menu";
 import { IconButton } from "@/components/ui/icon-button";
 import { useSessionsContext } from "@/hooks/use-sessions";
-import { cn } from "@/lib/utils";
 import { formatRelativeTime } from "@/lib/time";
+import { cn } from "@/lib/utils";
 
 export interface SessionItem {
   id: string;
@@ -268,15 +268,15 @@ function SessionListItem({ session, isActive }: { session: SessionItem; isActive
   const relativeTime = formatRelativeTime(timestamp);
   const isArchived = session.status === "archived";
 
-  // Use branch name or generate from title
-  const branchDisplay = session.branchName || session.title || "main";
-  const truncatedBranch = branchDisplay.length > 20
-    ? branchDisplay.slice(0, 20) + "..."
-    : branchDisplay;
+  // Display title (matching the session page header)
+  const titleDisplay = session.title || `${session.repoOwner}/${session.repoName}`;
+  const truncatedTitle =
+    titleDisplay.length > 25 ? titleDisplay.slice(0, 25) + "..." : titleDisplay;
 
-  // Mock diff stats - in real app these would come from the session data
-  const additions = session.additions || Math.floor(Math.random() * 500);
-  const deletions = session.deletions || Math.floor(Math.random() * 200);
+  // Diff stats from actual file changes (synced when viewing session)
+  const additions = session.additions ?? 0;
+  const deletions = session.deletions ?? 0;
+  const hasDiffStats = additions > 0 || deletions > 0;
 
   const handleArchive = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -311,11 +311,13 @@ function SessionListItem({ session, isActive }: { session: SessionItem; isActive
           <GitBranch className="size-3.5 text-muted-foreground mt-0.5 flex-shrink-0" />
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
-              <span className="text-sm truncate">{truncatedBranch}</span>
-              <span className="text-xs font-mono flex items-center gap-1 flex-shrink-0">
-                <span className="text-git-green">+{additions}</span>
-                <span className="text-git-red">-{deletions}</span>
-              </span>
+              <span className="text-sm truncate">{truncatedTitle}</span>
+              {hasDiffStats && (
+                <span className="text-xs font-mono flex items-center gap-1 flex-shrink-0">
+                  <span className="text-git-green">+{additions}</span>
+                  <span className="text-git-red">-{deletions}</span>
+                </span>
+              )}
             </div>
             <div className="text-xs text-muted-foreground mt-0.5">
               {session.repoName} · {relativeTime}
@@ -339,10 +341,7 @@ function SessionListItem({ session, isActive }: { session: SessionItem; isActive
           )}
         </ContextMenuItem>
         <ContextMenuSeparator />
-        <ContextMenuItem
-          onClick={handleDelete}
-          className="text-destructive focus:text-destructive"
-        >
+        <ContextMenuItem onClick={handleDelete} className="text-destructive focus:text-destructive">
           <Trash2 className="mr-2 size-4" />
           Delete
         </ContextMenuItem>

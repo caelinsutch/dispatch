@@ -67,7 +67,7 @@ export function SessionRightSidebar({
   }
 
   return (
-    <aside className="w-80 border-l border-border-muted overflow-y-auto hidden lg:block">
+    <aside className="h-full overflow-y-auto">
       {/* Participants */}
       <Panel variant="ghost" padding="md" className="border-b border-border-muted rounded-none">
         <PanelHeader>

@@ -1,20 +1,10 @@
 "use client";
 
-import {
-  Brain,
-  ChevronRight,
-  FileSearch,
-  FileText,
-  Globe,
-  ListTodo,
-  Pencil,
-  Search,
-  Terminal,
-  Zap,
-} from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { useState } from "react";
 import type { SandboxEvent } from "@/lib/tool-formatters";
 import { formatToolGroup } from "@/lib/tool-formatters";
+import { getToolIcon } from "@/lib/tool-icons";
 import { cn } from "@/lib/utils";
 import { type FileChange, MessageFooter } from "./message-footer";
 import { ToolCallItem } from "./tool-call-item";
@@ -22,36 +12,6 @@ import { ToolCallItem } from "./tool-call-item";
 interface ToolCallGroupProps {
   events: SandboxEvent[];
   groupId: string;
-}
-
-function ToolIcon({ toolName }: { toolName: string }) {
-  const iconClass = "size-3 text-muted-foreground group-hover:text-foreground";
-  // Normalize to handle both "Read" and "read" style names
-  const normalized = toolName.charAt(0).toUpperCase() + toolName.slice(1).toLowerCase();
-
-  switch (normalized) {
-    case "Read":
-      return <FileText className={iconClass} />;
-    case "Edit":
-      return <Pencil className={iconClass} />;
-    case "Write":
-      return <Pencil className={iconClass} />;
-    case "Bash":
-      return <Terminal className={iconClass} />;
-    case "Glob":
-      return <FileSearch className={iconClass} />;
-    case "Grep":
-      return <Search className={iconClass} />;
-    case "Task":
-      return <Brain className={iconClass} />;
-    case "Webfetch":
-      return <Globe className={iconClass} />;
-    case "Todoread":
-    case "Todowrite":
-      return <ListTodo className={iconClass} />;
-    default:
-      return <Zap className={iconClass} />;
-  }
 }
 
 // Get unique tool types from events
@@ -127,9 +87,7 @@ export function ToolCallGroup({ events, groupId }: ToolCallGroupProps) {
 
   const handleCopy = () => {
     // Copy tool call summaries to clipboard
-    const summary = events
-      .map((e) => `${e.tool}: ${JSON.stringify(e.args)}`)
-      .join("\n");
+    const summary = events.map((e) => `${e.tool}: ${JSON.stringify(e.args)}`).join("\n");
     navigator.clipboard.writeText(summary);
   };
 
@@ -144,11 +102,7 @@ export function ToolCallGroup({ events, groupId }: ToolCallGroupProps) {
           onToggle={() => toggleItem(`${groupId}-0`)}
         />
         {singleFileChanges.length > 0 && (
-          <MessageFooter
-            fileChanges={singleFileChanges}
-            onCopy={handleCopy}
-            showUndo={false}
-          />
+          <MessageFooter fileChanges={singleFileChanges} onCopy={handleCopy} showUndo={false} />
         )}
       </div>
     );
@@ -182,7 +136,9 @@ export function ToolCallGroup({ events, groupId }: ToolCallGroupProps) {
             </div>
             <div className="flex items-center gap-1">
               {uniqueTools.map((tool) => (
-                <ToolIcon key={tool} toolName={tool} />
+                <span key={tool} className="text-muted-foreground group-hover:text-foreground">
+                  {getToolIcon(tool, "xs")}
+                </span>
               ))}
             </div>
           </div>

@@ -22,6 +22,31 @@ export function formatModelNameLower(modelId: string): string {
 }
 
 /**
+ * Format model ID to short display format (for compact UI)
+ * e.g., "claude-opus-4-5" → "Opus 4.5"
+ * e.g., "amazon-bedrock/anthropic.claude-opus-4-5-20251101-v1:0" → "Opus 4.5"
+ */
+export function formatModelNameShort(modelId: string): string {
+  if (!modelId) return "Unknown";
+
+  // Match simple format: claude-opus-4-5
+  const simpleMatch = modelId.match(/^claude-(\w+)-(\d+)-(\d+)$/i);
+  if (simpleMatch) {
+    const [, variant, major, minor] = simpleMatch;
+    return `${variant.charAt(0).toUpperCase()}${variant.slice(1).toLowerCase()} ${major}.${minor}`;
+  }
+
+  // Match Bedrock format: amazon-bedrock/anthropic.claude-opus-4-5-20251101-v1:0
+  const bedrockMatch = modelId.match(/claude[.-](\w+)[.-](\d+)[.-](\d+)/i);
+  if (bedrockMatch) {
+    const [, variant, major, minor] = bedrockMatch;
+    return `${variant.charAt(0).toUpperCase()}${variant.slice(1).toLowerCase()} ${major}.${minor}`;
+  }
+
+  return modelId.replace(/-/g, " ");
+}
+
+/**
  * Truncate branch name with ellipsis at start
  * e.g., "feature/very-long-branch-name-here" → "...long-branch-name-here"
  */

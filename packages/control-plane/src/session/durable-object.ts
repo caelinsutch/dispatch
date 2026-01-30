@@ -1021,9 +1021,26 @@ export class SessionDO extends DurableObject<Env> {
     );
     const messages = messagesResult.toArray() as unknown as MessageWithParticipant[];
 
-    // Get events (tool calls, tokens, etc.)
-    const eventsResult = this.sql.exec(`SELECT * FROM events ORDER BY created_at ASC LIMIT 500`);
-    const events = eventsResult.toArray() as unknown as EventRow[];
+    // Get events (tool calls, tokens, etc.) - increased limit to handle long conversations
+    const eventsResult = this.sql.exec(`SELECT * FROM events ORDER BY created_at ASC LIMIT 2000`);
+    const allEvents = eventsResult.toArray() as unknown as EventRow[];
+
+    // Filter token events to only keep the last one per message_id
+    // This avoids sending hundreds of intermediate streaming tokens
+    const lastTokenByMessage = new Map<string | null, EventRow>();
+    const nonTokenEvents: EventRow[] = [];
+
+    for (const event of allEvents) {
+      if (event.type === "token") {
+        // Keep track of the latest token per message_id
+        lastTokenByMessage.set(event.message_id, event);
+      } else {
+        nonTokenEvents.push(event);
+      }
+    }
+
+    // Combine non-token events with only the last token per message
+    const events = [...nonTokenEvents, ...Array.from(lastTokenByMessage.values())];
 
     // Combine and sort by timestamp
     interface HistoryItem {
@@ -1073,6 +1090,9 @@ export class SessionDO extends DurableObject<Env> {
         }
       }
     }
+
+    // Signal that historical events are complete
+    this.safeSend(ws, { type: "history_complete" });
   }
 
   /**
@@ -1329,6 +1349,11 @@ export class SessionDO extends DurableObject<Env> {
       if (title) {
         console.log(`[DO] Session title updated: ${title}`);
         this.sql.exec(`UPDATE session SET title = ?, updated_at = ?`, title, now);
+
+        // Proactively sync title to KV index for consistent list display
+        this.syncTitleToKV(title, now).catch((err) => {
+          console.warn(`[DO] Failed to sync title to KV:`, err);
+        });
       }
     }
 
@@ -1464,6 +1489,36 @@ export class SessionDO extends DurableObject<Env> {
       this.pendingPushResolver.reject(new Error(error));
       this.pendingPushResolver = null;
     }
+  }
+
+  /**
+   * Sync session title to KV index for consistent list display.
+   * This ensures the sessions list shows the correct title without requiring
+   * individual session fetches to trigger lazy sync.
+   */
+  private async syncTitleToKV(title: string, updatedAt: number): Promise<void> {
+    const session = this.getSession();
+    if (!session) return;
+
+    const sessionId = session.session_name || session.id;
+    const kvKey = `session:${sessionId}`;
+
+    // Get current KV data
+    const kvData = await this.env.SESSION_INDEX.get(kvKey, "json");
+    if (!kvData || typeof kvData !== "object") {
+      console.warn(`[DO] KV entry not found for ${kvKey}, skipping sync`);
+      return;
+    }
+
+    // Update title and timestamp
+    const updated = {
+      ...(kvData as Record<string, unknown>),
+      title,
+      updatedAt,
+    };
+
+    await this.env.SESSION_INDEX.put(kvKey, JSON.stringify(updated));
+    console.log(`[DO] Synced title to KV: ${title}`);
   }
 
   /**
