@@ -4,7 +4,7 @@ import { DEFAULT_MODEL } from "@dispatch/shared";
 import { PanelLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { SidebarLayout, useSidebarContext } from "@/components/sidebar-layout";
+import { useSidebarContext } from "@/components/sidebar-layout";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
@@ -22,6 +22,7 @@ interface Repo {
 
 export default function NewSessionPage() {
   const { data: session, isPending } = authClient.useSession();
+  const { isOpen, toggle } = useSidebarContext();
   const router = useRouter();
   const [repos, setRepos] = useState<Repo[]>([]);
   const [loading, setLoading] = useState(true);
@@ -95,45 +96,11 @@ export default function NewSessionPage() {
 
   if (isPending || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="h-full flex items-center justify-center">
         <Spinner size="lg" />
       </div>
     );
   }
-
-  return (
-    <SidebarLayout>
-      <NewSessionContent
-        repos={repos}
-        selectedRepo={selectedRepo}
-        setSelectedRepo={setSelectedRepo}
-        error={error}
-        setError={setError}
-        creating={creating}
-        handleSubmit={handleSubmit}
-      />
-    </SidebarLayout>
-  );
-}
-
-function NewSessionContent({
-  repos,
-  selectedRepo,
-  setSelectedRepo,
-  error,
-  setError,
-  creating,
-  handleSubmit,
-}: {
-  repos: Repo[];
-  selectedRepo: string;
-  setSelectedRepo: (value: string) => void;
-  error: string;
-  setError: (value: string) => void;
-  creating: boolean;
-  handleSubmit: (e: React.FormEvent) => void;
-}) {
-  const { isOpen, toggle } = useSidebarContext();
 
   return (
     <div className="h-full flex flex-col">

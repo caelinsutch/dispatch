@@ -1,32 +1,32 @@
 "use client";
 
 import {
-  Box,
-  ChevronRight,
+  Brain,
+  FileSearch,
   FileText,
-  Folder,
   Globe,
   HelpCircle,
+  ListTodo,
+  Minus,
   Pencil,
   Plus,
   Search,
   Terminal,
+  Zap,
 } from "lucide-react";
 import type { SandboxEvent } from "@/lib/tool-formatters";
 import { formatToolCall } from "@/lib/tool-formatters";
-import { cn } from "@/lib/utils";
 
 interface ToolCallItemProps {
   event: SandboxEvent;
   isExpanded: boolean;
   onToggle: () => void;
-  showTime?: boolean;
 }
 
 function ToolIcon({ name }: { name: string | null }) {
   if (!name) return null;
 
-  const iconClass = "h-3.5 w-3.5 text-secondary-foreground";
+  const iconClass = "size-3 text-muted-foreground";
 
   switch (name) {
     case "file":
@@ -39,70 +39,77 @@ function ToolIcon({ name }: { name: string | null }) {
       return <Terminal className={iconClass} />;
     case "search":
       return <Search className={iconClass} />;
-    case "folder":
-      return <Folder className={iconClass} />;
-    case "box":
-      return <Box className={iconClass} />;
+    case "filesearch":
+      return <FileSearch className={iconClass} />;
     case "globe":
       return <Globe className={iconClass} />;
     case "question":
       return <HelpCircle className={iconClass} />;
+    case "brain":
+      return <Brain className={iconClass} />;
+    case "list":
+      return <ListTodo className={iconClass} />;
     default:
-      return null;
+      return <Zap className={iconClass} />;
   }
 }
 
-export function ToolCallItem({ event, isExpanded, onToggle, showTime = true }: ToolCallItemProps) {
+export function ToolCallItem({ event, isExpanded, onToggle }: ToolCallItemProps) {
   const formatted = formatToolCall(event);
-  const time = new Date(event.timestamp * 1000).toLocaleTimeString([], {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-
   const { args, output } = formatted.getDetails();
 
   return (
-    <div className="py-0.5">
-      <button
-        type="button"
+    <div className="w-full">
+      <div
+        role="button"
+        tabIndex={0}
         onClick={onToggle}
-        className="w-full flex items-center gap-1.5 text-sm text-left text-muted-foreground hover:text-foreground transition-colors"
+        onKeyDown={(e) => e.key === "Enter" && onToggle()}
+        className="inline-flex items-center gap-2 py-1 group/collapsible max-w-full hover:bg-muted/50 cursor-pointer"
       >
-        <ChevronRight
-          className={cn(
-            "h-3.5 w-3.5 text-secondary-foreground transition-transform duration-200",
-            isExpanded && "rotate-90"
+        <div className="flex-shrink-0">
+          {isExpanded ? (
+            <Minus className="size-3 text-muted-foreground" />
+          ) : (
+            <>
+              <Plus className="size-3 text-muted-foreground hidden group-hover/collapsible:block" />
+              <div className="group-hover/collapsible:hidden">
+                <ToolIcon name={formatted.icon} />
+              </div>
+            </>
           )}
-        />
-        <ToolIcon name={formatted.icon} />
-        <span className="truncate">
-          {formatted.toolName} {formatted.summary}
-        </span>
-        {showTime && (
-          <span className="text-xs text-secondary-foreground flex-shrink-0 ml-auto">{time}</span>
-        )}
-      </button>
+        </div>
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          <div className="text-sm truncate">
+            <span>{formatted.toolName}</span>
+          </div>
+          {formatted.summary && (
+            <span className="text-xs font-mono font-medium text-muted-foreground bg-muted px-1 py-0.5 rounded-md truncate max-w-[400px]">
+              {formatted.summary}
+            </span>
+          )}
+        </div>
+      </div>
 
       {isExpanded && (
-        <div className="mt-2 ml-5 p-3 bg-card border border-border-muted text-xs overflow-hidden">
-          {args && Object.keys(args).length > 0 && (
-            <div className="mb-2">
-              <div className="text-muted-foreground mb-1 font-medium">Arguments:</div>
-              <pre className="overflow-x-auto text-foreground whitespace-pre-wrap">
+        <div className="mt-2 ml-5 p-3 bg-muted/30 border border-border-muted rounded-md text-xs overflow-hidden">
+          {formatted.showArgs && args && Object.keys(args).length > 0 && (
+            <div className={output ? "mb-2" : ""}>
+              <div className="sidebar-label mb-2">Arguments</div>
+              <pre className="overflow-x-auto text-foreground whitespace-pre-wrap font-mono">
                 {JSON.stringify(args, null, 2)}
               </pre>
             </div>
           )}
           {output && (
             <div>
-              <div className="text-muted-foreground mb-1 font-medium">Output:</div>
-              <pre className="overflow-x-auto max-h-48 text-foreground whitespace-pre-wrap">
+              <pre className="overflow-x-auto max-h-48 text-foreground whitespace-pre-wrap font-mono">
                 {output}
               </pre>
             </div>
           )}
-          {!args && !output && (
-            <span className="text-secondary-foreground">No details available</span>
+          {(!formatted.showArgs || !args) && !output && (
+            <span className="text-muted-foreground">No details available</span>
           )}
         </div>
       )}

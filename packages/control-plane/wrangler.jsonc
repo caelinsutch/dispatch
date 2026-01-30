@@ -43,6 +43,14 @@
   // Environment variables (non-secret)
   "vars": {
     "DEPLOYMENT_NAME": "dispatch"
+  },
+
+  // Observability
+  "observability": {
+    "logs": {
+      "enabled": true,
+      "invocation_logs": true
+    }
   }
 
   // Secrets (set via: wrangler secret put <KEY>)

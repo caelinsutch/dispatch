@@ -8,7 +8,7 @@ import type { QuestionInfo } from "@/components/question-card";
 import { AnsweredQuestion, QuestionCard } from "@/components/question-card";
 import { SafeMarkdown } from "@/components/safe-markdown";
 import { SessionRightSidebar } from "@/components/session-right-sidebar";
-import { SidebarLayout, useSidebarContext } from "@/components/sidebar-layout";
+import { useSidebarContext } from "@/components/sidebar-layout";
 import { ToolCallGroup } from "@/components/tool-call-group";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -24,6 +24,7 @@ import { SessionContext, useSessionSocket } from "@/hooks/use-session-socket";
 import { authClient } from "@/lib/auth-client";
 import { formatModelNameLower } from "@/lib/format";
 import type { SandboxEvent } from "@/types/session";
+import { MessageFooter } from "@/components/message-footer";
 
 // Hook to access session context
 function useSession() {
@@ -158,7 +159,7 @@ export default function SessionPage() {
 
   if (authPending) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="h-full flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground" />
       </div>
     );
@@ -166,9 +167,7 @@ export default function SessionPage() {
 
   return (
     <SessionContext value={session}>
-      <SidebarLayout>
-        <SessionContent />
-      </SidebarLayout>
+      <SessionContent />
     </SessionContext>
   );
 }
@@ -713,45 +712,44 @@ function EventItem({
 
   switch (event.type) {
     case "user_message": {
-      // Display user's prompt with correct author attribution
+      // Display user's prompt with correct author attribution - right aligned
       if (!event.content) return null;
 
-      // Determine if this message is from the current user
-      const isCurrentUser =
-        event.author?.participantId && currentParticipantId
-          ? event.author.participantId === currentParticipantId
-          : !event.author; // Messages without author are assumed to be from current user (local)
-
-      const authorName = isCurrentUser ? "You" : event.author?.name || "Unknown User";
-
       return (
-        <div className="bg-accent-muted p-4 ml-8">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
-              {!isCurrentUser && event.author?.avatar && (
-                <img src={event.author.avatar} alt={authorName} className="w-5 h-5 rounded-full" />
-              )}
-              <span className="text-xs font-medium text-foreground">{authorName}</span>
+        <div className="flex justify-end pb-4">
+          <div className="relative min-w-0 max-w-full">
+            <div className="max-w-xl lg:max-w-3xl p-3 rounded px-4 break-words overflow-hidden bg-highlight text-highlight-foreground">
+              <div className="text-sm break-words whitespace-pre-wrap">
+                {event.content}
+              </div>
             </div>
-            <span className="text-xs text-secondary-foreground">{time}</span>
           </div>
-          <SafeMarkdown content={event.content} className="text-sm" />
         </div>
       );
     }
 
-    case "token":
+    case "token": {
       // Display the model's text response with safe markdown rendering
       if (!event.content) return null;
+
+      const handleCopy = () => {
+        navigator.clipboard.writeText(event.content || "");
+      };
+
       return (
-        <div className="bg-card p-4">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs text-muted-foreground">Assistant</span>
-            <span className="text-xs text-secondary-foreground">{time}</span>
+        <div className="flex justify-start relative">
+          <div className="flex flex-col w-full max-w-xl lg:max-w-3xl space-y-1 break-words">
+            <div className="my-1">
+              <SafeMarkdown content={event.content} className="prose prose-sm dark:prose-invert antialiased select-text text-pretty" />
+            </div>
+            <MessageFooter
+              onCopy={handleCopy}
+              showUndo={false}
+            />
           </div>
-          <SafeMarkdown content={event.content} className="text-sm" />
         </div>
       );
+    }
 
     case "tool_call":
       // Tool calls are handled by ToolCallGroup component
@@ -786,13 +784,9 @@ function EventItem({
       );
 
     case "execution_complete":
-      return (
-        <div className="flex items-center gap-2 text-sm text-success">
-          <span className="w-2 h-2 rounded-full bg-success" />
-          Execution complete
-          <span className="text-xs text-secondary-foreground">{time}</span>
-        </div>
-      );
+      // Execution complete events are now handled via the message footer
+      // They don't need their own visual representation
+      return null;
 
     default:
       return null;

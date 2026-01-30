@@ -4,9 +4,11 @@ import { Github } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { createContext, use } from "react";
 import { useSidebar } from "@/hooks/use-sidebar";
+import { SessionsProvider } from "@/hooks/use-sessions";
 import { authClient } from "@/lib/auth-client";
 import { SessionSidebar } from "./session-sidebar";
 import { Button } from "./ui/button";
+import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "./ui/resizable";
 import { Spinner } from "./ui/spinner";
 
 interface SidebarContextValue {
@@ -66,17 +68,26 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
 
   return (
     <SidebarContext.Provider value={sidebar}>
-      <div className="flex h-screen overflow-hidden">
-        {/* Sidebar with transition */}
-        <div
-          className={`transition-all duration-200 ease-in-out ${
-            sidebar.isOpen ? "w-72" : "w-0"
-          } flex-shrink-0 overflow-hidden`}
-        >
-          <SessionSidebar onNewSession={handleNewSession} onToggle={sidebar.toggle} />
+      <SessionsProvider isAuthenticated={!!session}>
+        <div className="h-screen overflow-hidden">
+          <ResizablePanelGroup orientation="horizontal" id="sidebar-layout">
+            {/* Resizable Sidebar */}
+            <ResizablePanel
+              id="sidebar"
+              defaultSize="20%"
+              minSize="280px"
+              maxSize="50%"
+            >
+              <SessionSidebar onNewSession={handleNewSession} onToggle={sidebar.toggle} />
+            </ResizablePanel>
+            <ResizableHandle />
+            {/* Main Content */}
+            <ResizablePanel id="main" defaultSize="80%" minSize="50%">
+              <main className="h-full overflow-hidden">{children}</main>
+            </ResizablePanel>
+          </ResizablePanelGroup>
         </div>
-        <main className="flex-1 overflow-hidden">{children}</main>
-      </div>
+      </SessionsProvider>
     </SidebarContext.Provider>
   );
 }

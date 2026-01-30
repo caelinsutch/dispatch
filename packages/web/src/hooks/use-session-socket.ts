@@ -178,16 +178,23 @@ export function useSessionSocket(sessionId: string): UseSessionSocketReturn {
               }
               setEvents((prev) => [...prev, event]);
             } else if (event.type === "tool_call" && event.callId) {
-              // Deduplicate tool_call events by callId - keep the latest (most complete) one
+              // Deduplicate tool_call events by callId - merge with existing to preserve args
               setEvents((prev) => {
                 const existingIdx = seenToolCallsRef.current.get(event.callId!);
-                if (existingIdx !== undefined) {
-                  // Update existing event with new data
+                if (existingIdx !== undefined && prev[existingIdx]) {
+                  // Merge new event with existing, preserving original args (like questions)
+                  // while updating status and output from the new event
+                  const existing = prev[existingIdx];
                   const updated = [...prev];
-                  updated[existingIdx] = event;
+                  updated[existingIdx] = {
+                    ...existing,
+                    ...event,
+                    // Merge args to preserve original data like questions
+                    args: { ...(existing.args || {}), ...(event.args || {}) },
+                  };
                   return updated;
                 }
-                // Track new tool call
+                // Track new tool call (or update stale index)
                 seenToolCallsRef.current.set(event.callId!, prev.length);
                 return [...prev, event];
               });
@@ -297,6 +304,16 @@ export function useSessionSocket(sessionId: string): UseSessionSocketReturn {
 
         case "error":
           console.error("Session error:", data);
+          break;
+
+        case "question_answer_queued":
+          console.log("Question answer queued:", data);
+          // The answer is queued, sandbox is starting - no action needed
+          break;
+
+        case "question_answer_error":
+          console.error("Question answer error:", data);
+          // TODO: Could emit an event or update state to show error in UI
           break;
       }
     },
@@ -501,7 +518,7 @@ export function useSessionSocket(sessionId: string): UseSessionSocketReturn {
 
   const sendQuestionAnswer = useCallback((requestId: string, answers: string[][]) => {
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
-      console.error("WebSocket not connected");
+      console.error("WebSocket not connected, cannot send question answer");
       return;
     }
     wsRef.current.send(

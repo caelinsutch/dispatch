@@ -1155,6 +1155,22 @@ class AgentBridge:
 
             print(f"[bridge] Question reply sent successfully for {request_id}")
 
+            # Emit tool_call completed event immediately so the UI updates
+            # This prevents race condition where OpenCode's completed event
+            # might be missed because it's emitted before we subscribe to SSE
+            await self._send_event(
+                {
+                    "type": "tool_call",
+                    "tool": "question",
+                    "callId": request_id,
+                    "args": {"id": request_id},
+                    "status": "completed",
+                    "output": json.dumps(answers),
+                    "messageId": message_id,
+                }
+            )
+            print(f"[bridge] Emitted question completed event for {request_id}")
+
             # Subscribe to SSE and stream continuation events
             print("[bridge] Subscribing to SSE for continuation events...")
             async for event in self._stream_sse_continuation(message_id):

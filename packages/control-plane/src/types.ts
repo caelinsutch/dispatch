@@ -85,7 +85,8 @@ export type ClientMessage =
       type: "presence";
       status: "active" | "idle";
       cursor?: { line: number; file: string };
-    };
+    }
+  | { type: "question_answer"; requestId: string; answers: string[][] };
 
 // Server → Client messages
 export type ServerMessage =

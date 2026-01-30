@@ -35,19 +35,36 @@ export interface FormattedToolCall {
   summary: string;
   /** Icon name or null */
   icon: string | null;
+  /** Whether to show arguments in expanded view (most tools don't need this) */
+  showArgs: boolean;
   /** Full details for expanded view - returns JSX-safe content */
   getDetails: () => { args?: Record<string, unknown>; output?: string };
 }
 
 /**
+ * Extract hostname from URL
+ */
+function getHostname(url: string | undefined): string {
+  if (!url) return "url";
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return truncate(url, 30);
+  }
+}
+
+/**
  * Format a tool call event for compact display
  * Note: OpenCode uses camelCase field names (filePath, not file_path)
+ * Handles both capitalized (Read) and lowercase (read) tool names
  */
 export function formatToolCall(event: SandboxEvent): FormattedToolCall {
   const { tool, args, output } = event;
-  const toolName = tool || "Unknown";
+  const rawToolName = tool || "Unknown";
+  // Normalize to handle both "Read" and "read" style names
+  const normalizedTool = rawToolName.charAt(0).toUpperCase() + rawToolName.slice(1).toLowerCase();
 
-  switch (toolName) {
+  switch (normalizedTool) {
     case "Read": {
       // OpenCode uses filePath (camelCase)
       const filePath = (args?.filePath ?? args?.file_path) as string | undefined;
@@ -58,6 +75,7 @@ export function formatToolCall(event: SandboxEvent): FormattedToolCall {
           ? `${basename(filePath)}${lineCount > 0 ? ` (${lineCount} lines)` : ""}`
           : "file",
         icon: "file",
+        showArgs: false,
         getDetails: () => ({ args, output }),
       };
     }
@@ -68,6 +86,7 @@ export function formatToolCall(event: SandboxEvent): FormattedToolCall {
         toolName: "Edit",
         summary: filePath ? basename(filePath) : "file",
         icon: "pencil",
+        showArgs: false,
         getDetails: () => ({ args, output }),
       };
     }
@@ -78,103 +97,130 @@ export function formatToolCall(event: SandboxEvent): FormattedToolCall {
         toolName: "Write",
         summary: filePath ? basename(filePath) : "file",
         icon: "plus",
+        showArgs: false,
         getDetails: () => ({ args, output }),
       };
     }
 
     case "Bash": {
+      // Use description if available, otherwise show truncated command
+      const description = args?.description as string | undefined;
       const command = args?.command as string | undefined;
       return {
         toolName: "Bash",
-        summary: truncate(command, 50),
+        summary: description ? truncate(description, 50) : truncate(command, 50),
         icon: "terminal",
+        showArgs: false,
         getDetails: () => ({ args, output }),
       };
     }
 
     case "Grep": {
       const pattern = args?.pattern as string | undefined;
-      const matchCount = output ? countLines(output) : 0;
+      const include = args?.include as string | undefined;
+      // Extract match count from output like "Found 29 matches"
+      const matchCount = output?.match(/Found (\d+) matches/)?.[1];
+      let summary = pattern ? `"${truncate(pattern, 20)}"` : "search";
+      if (include) summary += ` in ${include}`;
+      if (matchCount) summary += ` (${matchCount} matches)`;
       return {
         toolName: "Grep",
-        summary: pattern
-          ? `"${truncate(pattern, 30)}"${matchCount > 0 ? ` (${matchCount} matches)` : ""}`
-          : "search",
+        summary,
         icon: "search",
+        showArgs: false,
         getDetails: () => ({ args, output }),
       };
     }
 
     case "Glob": {
       const pattern = args?.pattern as string | undefined;
-      const fileCount = output ? countLines(output) : 0;
+      const fileCount = output ? output.split("\n").filter(Boolean).length : 0;
       return {
         toolName: "Glob",
         summary: pattern
           ? `${truncate(pattern, 30)}${fileCount > 0 ? ` (${fileCount} files)` : ""}`
           : "search",
-        icon: "folder",
+        icon: "filesearch",
+        showArgs: false,
         getDetails: () => ({ args, output }),
       };
     }
 
     case "Task": {
       const description = args?.description as string | undefined;
-      const prompt = args?.prompt as string | undefined;
+      const subagentType = args?.subagent_type as string | undefined;
+      const typeLabel = subagentType ? `[${subagentType}] ` : "";
       return {
         toolName: "Task",
-        summary: description ? truncate(description, 40) : prompt ? truncate(prompt, 40) : "task",
-        icon: "box",
+        summary: description ? `${typeLabel}${truncate(description, 40)}` : "task",
+        icon: "brain",
+        showArgs: false,
         getDetails: () => ({ args, output }),
       };
     }
 
-    case "WebFetch": {
+    case "Webfetch": {
       const url = args?.url as string | undefined;
       return {
         toolName: "WebFetch",
-        summary: url ? truncate(url, 40) : "url",
+        summary: `Fetch ${getHostname(url)}`,
         icon: "globe",
+        showArgs: false,
         getDetails: () => ({ args, output }),
       };
     }
 
-    case "WebSearch": {
+    case "Websearch": {
       const query = args?.query as string | undefined;
       return {
         toolName: "WebSearch",
         summary: query ? `"${truncate(query, 40)}"` : "search",
         icon: "search",
+        showArgs: false,
         getDetails: () => ({ args, output }),
       };
     }
 
-    case "TodoWrite": {
+    case "Todoread": {
+      return {
+        toolName: "TodoRead",
+        summary: "Read task list",
+        icon: "list",
+        showArgs: false,
+        getDetails: () => ({ args, output }),
+      };
+    }
+
+    case "Todowrite": {
       const todos = args?.todos as unknown[] | undefined;
+      const count = todos?.length ?? 0;
       return {
         toolName: "TodoWrite",
-        summary: todos ? `${todos.length} item${todos.length === 1 ? "" : "s"}` : "todos",
-        icon: "file",
+        summary: count > 0 ? `Update ${count} task${count === 1 ? "" : "s"}` : "Update tasks",
+        icon: "list",
+        showArgs: false,
         getDetails: () => ({ args, output }),
       };
     }
 
-    case "question": {
+    case "Question": {
       const questions = args?.questions as { question?: string }[] | undefined;
       const firstQuestion = questions?.[0]?.question;
       return {
         toolName: "Question",
         summary: firstQuestion ? truncate(firstQuestion, 50) : "asking...",
         icon: "question",
+        showArgs: false,
         getDetails: () => ({ args, output }),
       };
     }
 
     default:
       return {
-        toolName,
+        toolName: rawToolName,
         summary: args && Object.keys(args).length > 0 ? truncate(JSON.stringify(args), 50) : "",
         icon: null,
+        showArgs: true, // Unknown tools show args since we don't have a good summary
         getDetails: () => ({ args, output }),
       };
   }
