@@ -1,5 +1,6 @@
 "use client";
 
+import { CheckCircle, Circle, Clock } from "lucide-react";
 import type { Task } from "@/types/session";
 
 interface TasksSectionProps {
@@ -38,51 +39,21 @@ function TaskStatusIcon({ status }: { status: Task["status"] }) {
     case "in_progress":
       return (
         <span className="mt-0.5 flex-shrink-0">
-          <ClockIcon className="w-4 h-4 text-accent animate-pulse" />
+          <Clock className="h-4 w-4 text-accent animate-pulse" />
         </span>
       );
     case "completed":
       return (
         <span className="mt-0.5 flex-shrink-0">
-          <CheckCircleIcon className="w-4 h-4 text-success" />
+          <CheckCircle className="h-4 w-4 text-success" />
         </span>
       );
     case "pending":
     default:
       return (
         <span className="mt-0.5 flex-shrink-0">
-          <EmptyCircleIcon className="w-4 h-4 text-secondary-foreground" />
+          <Circle className="h-4 w-4 text-secondary-foreground" />
         </span>
       );
   }
-}
-
-function ClockIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <circle cx="12" cy="12" r="10" strokeWidth={2} />
-      <path strokeLinecap="round" strokeWidth={2} d="M12 6v6l4 2" />
-    </svg>
-  );
-}
-
-function CheckCircleIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-      />
-    </svg>
-  );
-}
-
-function EmptyCircleIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <circle cx="12" cy="12" r="9" strokeWidth={2} />
-    </svg>
-  );
 }

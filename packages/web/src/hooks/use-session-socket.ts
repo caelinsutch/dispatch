@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import type { Artifact } from "@/types/session";
+import { createContext, useCallback, useEffect, useRef, useState } from "react";
+import type { Artifact, SandboxEvent } from "@/types/session";
 
 // WebSocket URL (should come from env in production)
 const WS_URL = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8787";
@@ -10,35 +10,7 @@ const WS_URL = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8787";
 const WS_CLOSE_AUTH_REQUIRED = 4001;
 const WS_CLOSE_SESSION_EXPIRED = 4002;
 
-interface Message {
-  id: string;
-  authorId: string;
-  content: string;
-  source: string;
-  status: string;
-  createdAt: number;
-}
-
-interface SandboxEvent {
-  type: string;
-  content?: string;
-  messageId?: string;
-  tool?: string;
-  args?: Record<string, unknown>;
-  callId?: string;
-  result?: string;
-  error?: string;
-  status?: string;
-  sha?: string;
-  timestamp: number;
-  author?: {
-    participantId: string;
-    name: string;
-    avatar?: string;
-  };
-}
-
-interface SessionState {
+export interface SessionState {
   id: string;
   title: string | null;
   repoOwner: string;
@@ -54,7 +26,7 @@ interface SessionState {
   activePorts?: number[];
 }
 
-interface Participant {
+export interface Participant {
   participantId: string;
   userId: string;
   name: string;
@@ -63,23 +35,26 @@ interface Participant {
   lastSeen: number;
 }
 
-interface UseSessionSocketReturn {
+export interface UseSessionSocketReturn {
   connected: boolean;
   connecting: boolean;
   authError: string | null;
   connectionError: string | null;
   sessionState: SessionState | null;
-  messages: Message[];
   events: SandboxEvent[];
   participants: Participant[];
   artifacts: Artifact[];
   currentParticipantId: string | null;
   isProcessing: boolean;
   sendPrompt: (content: string, model?: string) => void;
+  sendQuestionAnswer: (requestId: string, answers: string[][]) => void;
   stopExecution: () => void;
   sendTyping: () => void;
   reconnect: () => void;
 }
+
+// Context for sharing session state without prop drilling
+export const SessionContext = createContext<UseSessionSocketReturn | null>(null);
 
 export function useSessionSocket(sessionId: string): UseSessionSocketReturn {
   const wsRef = useRef<WebSocket | null>(null);
@@ -92,12 +67,15 @@ export function useSessionSocket(sessionId: string): UseSessionSocketReturn {
   const pendingTextRef = useRef<{ content: string; messageId: string; timestamp: number } | null>(
     null
   );
+  // Track seen tool call IDs for deduplication
+  const seenToolCallsRef = useRef<Map<string, number>>(new Map());
+  const seenCompletionsRef = useRef<Set<string>>(new Set());
+
   const [connected, setConnected] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [sessionState, setSessionState] = useState<SessionState | null>(null);
-  const [messages, _setMessages] = useState<Message[]>([]);
   const [events, setEvents] = useState<SandboxEvent[]>([]);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [artifacts, setArtifacts] = useState<Artifact[]>([]);
@@ -110,6 +88,23 @@ export function useSessionSocket(sessionId: string): UseSessionSocketReturn {
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const reconnectAttempts = useRef(0);
   const hasWarmedRef = useRef(false);
+
+  // Helper to flush pending text
+  const flushPendingText = useCallback(() => {
+    if (pendingTextRef.current) {
+      const pending = pendingTextRef.current;
+      pendingTextRef.current = null;
+      setEvents((prev) => [
+        ...prev,
+        {
+          type: "token",
+          content: pending.content,
+          messageId: pending.messageId,
+          timestamp: pending.timestamp,
+        },
+      ]);
+    }
+  }, []);
 
   const handleMessage = useCallback(
     (data: {
@@ -136,6 +131,8 @@ export function useSessionSocket(sessionId: string): UseSessionSocketReturn {
           setEvents([]);
           setArtifacts([]);
           pendingTextRef.current = null;
+          seenToolCallsRef.current.clear();
+          seenCompletionsRef.current.clear();
           if (data.state) {
             setSessionState(data.state);
           }
@@ -170,23 +167,32 @@ export function useSessionSocket(sessionId: string): UseSessionSocketReturn {
                 timestamp: event.timestamp,
               };
             } else if (event.type === "execution_complete") {
-              // On completion: Add final text to events using the token's original timestamp
-              if (pendingTextRef.current) {
-                const pending = pendingTextRef.current;
-                pendingTextRef.current = null;
-                setEvents((prev) => [
-                  ...prev,
-                  {
-                    type: "token",
-                    content: pending.content,
-                    messageId: pending.messageId,
-                    timestamp: pending.timestamp,
-                  },
-                ]);
+              // On completion: Add final text to events
+              flushPendingText();
+              // Skip duplicate execution_complete for the same message
+              if (event.messageId && seenCompletionsRef.current.has(event.messageId)) {
+                break;
+              }
+              if (event.messageId) {
+                seenCompletionsRef.current.add(event.messageId);
               }
               setEvents((prev) => [...prev, event]);
+            } else if (event.type === "tool_call" && event.callId) {
+              // Deduplicate tool_call events by callId - keep the latest (most complete) one
+              setEvents((prev) => {
+                const existingIdx = seenToolCallsRef.current.get(event.callId!);
+                if (existingIdx !== undefined) {
+                  // Update existing event with new data
+                  const updated = [...prev];
+                  updated[existingIdx] = event;
+                  return updated;
+                }
+                // Track new tool call
+                seenToolCallsRef.current.set(event.callId!, prev.length);
+                return [...prev, event];
+              });
             } else {
-              // Other events (tool_call, user_message, git_sync, etc.) - add normally
+              // Other events (user_message, git_sync, etc.) - add normally
               setEvents((prev) => [...prev, event]);
             }
           }
@@ -294,7 +300,7 @@ export function useSessionSocket(sessionId: string): UseSessionSocketReturn {
           break;
       }
     },
-    []
+    [flushPendingText]
   );
 
   const fetchWsToken = useCallback(async (): Promise<string | null> => {
@@ -404,6 +410,9 @@ export function useSessionSocket(sessionId: string): UseSessionSocketReturn {
       setConnecting(false);
       wsRef.current = null;
 
+      // Flush any pending text to prevent data loss
+      flushPendingText();
+
       // Handle authentication errors
       if (event.code === WS_CLOSE_AUTH_REQUIRED) {
         setAuthError("Authentication failed. Please sign in again.");
@@ -442,7 +451,7 @@ export function useSessionSocket(sessionId: string): UseSessionSocketReturn {
     ws.onerror = (error) => {
       console.error("WebSocket error event:", error);
     };
-  }, [sessionId, handleMessage, fetchWsToken]);
+  }, [sessionId, handleMessage, fetchWsToken, flushPendingText]);
 
   const sendPrompt = useCallback((content: string, model?: string) => {
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
@@ -486,20 +495,22 @@ export function useSessionSocket(sessionId: string): UseSessionSocketReturn {
       return;
     }
     // Preserve partial content when stopping
-    if (pendingTextRef.current) {
-      const pending = pendingTextRef.current;
-      pendingTextRef.current = null;
-      setEvents((prev) => [
-        ...prev,
-        {
-          type: "token",
-          content: pending.content,
-          messageId: pending.messageId,
-          timestamp: pending.timestamp,
-        },
-      ]);
-    }
+    flushPendingText();
     wsRef.current.send(JSON.stringify({ type: "stop" }));
+  }, [flushPendingText]);
+
+  const sendQuestionAnswer = useCallback((requestId: string, answers: string[][]) => {
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+      console.error("WebSocket not connected");
+      return;
+    }
+    wsRef.current.send(
+      JSON.stringify({
+        type: "question_answer",
+        requestId,
+        answers,
+      })
+    );
   }, []);
 
   const sendTyping = useCallback(() => {
@@ -559,13 +570,13 @@ export function useSessionSocket(sessionId: string): UseSessionSocketReturn {
     authError,
     connectionError,
     sessionState,
-    messages,
     events,
     participants,
     artifacts,
     currentParticipantId,
     isProcessing,
     sendPrompt,
+    sendQuestionAnswer,
     stopExecution,
     sendTyping,
     reconnect,

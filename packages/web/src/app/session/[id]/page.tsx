@@ -1,30 +1,37 @@
 "use client";
 
+import { ArrowUp, Check, Layers, LogOut, PanelLeft, Square } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActionBar } from "@/components/action-bar";
+import type { QuestionInfo } from "@/components/question-card";
 import { AnsweredQuestion, QuestionCard } from "@/components/question-card";
 import { SafeMarkdown } from "@/components/safe-markdown";
 import { SessionRightSidebar } from "@/components/session-right-sidebar";
 import { SidebarLayout, useSidebarContext } from "@/components/sidebar-layout";
 import { ToolCallGroup } from "@/components/tool-call-group";
-import { useSessionSocket } from "@/hooks/use-session-socket";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { HeaderSkeleton, MessageListSkeleton } from "@/components/ui/skeleton";
+import { SessionContext, useSessionSocket } from "@/hooks/use-session-socket";
 import { authClient } from "@/lib/auth-client";
 import { formatModelNameLower } from "@/lib/format";
-import type { SandboxEvent } from "@/lib/tool-formatters";
+import type { SandboxEvent } from "@/types/session";
 
-// Question types
-interface QuestionOption {
-  label: string;
-  description?: string;
-}
-
-interface QuestionInfo {
-  question: string;
-  header?: string;
-  options: QuestionOption[];
-  multiple?: boolean;
-  custom?: boolean;
+// Hook to access session context
+function useSession() {
+  const context = use(SessionContext);
+  if (!context) {
+    throw new Error("useSession must be used within SessionContext");
+  }
+  return context;
 }
 
 // Event grouping types
@@ -108,14 +115,6 @@ const MODEL_OPTIONS: { category: string; models: ModelOption[] }[] = [
   },
 ];
 
-function CheckIcon() {
-  return (
-    <svg className="w-4 h-4 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-    </svg>
-  );
-}
-
 function ModelOptionButton({
   model,
   isSelected,
@@ -137,7 +136,7 @@ function ModelOptionButton({
         <span className="font-medium">{model.name}</span>
         <span className="text-xs text-secondary-foreground">{model.description}</span>
       </div>
-      {isSelected && <CheckIcon />}
+      {isSelected && <Check className="h-4 w-4 text-accent" />}
     </button>
   );
 }
@@ -148,6 +147,33 @@ export default function SessionPage() {
   const router = useRouter();
   const sessionId = params.id as string;
 
+  const session = useSessionSocket(sessionId);
+
+  // Redirect if not authenticated
+  useEffect(() => {
+    if (!authPending && !_authSession) {
+      router.push("/");
+    }
+  }, [authPending, _authSession, router]);
+
+  if (authPending) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground" />
+      </div>
+    );
+  }
+
+  return (
+    <SessionContext value={session}>
+      <SidebarLayout>
+        <SessionContent />
+      </SidebarLayout>
+    </SessionContext>
+  );
+}
+
+function SessionContent() {
   const {
     connected,
     connecting,
@@ -160,71 +186,82 @@ export default function SessionPage() {
     currentParticipantId,
     isProcessing,
     sendPrompt,
+    sendQuestionAnswer,
     stopExecution,
     sendTyping,
     reconnect,
-  } = useSessionSocket(sessionId);
+  } = useSession();
 
-  const handleArchive = useCallback(async () => {
-    try {
-      const response = await fetch(`/api/sessions/${sessionId}/archive`, {
-        method: "POST",
-      });
-      if (!response.ok) {
-        console.error("Failed to archive session");
-      }
-    } catch (error) {
-      console.error("Failed to archive session:", error);
-    }
-  }, [sessionId]);
+  const { isOpen, toggle } = useSidebarContext();
 
-  const handleUnarchive = useCallback(async () => {
-    try {
-      const response = await fetch(`/api/sessions/${sessionId}/unarchive`, {
-        method: "POST",
-      });
-      if (!response.ok) {
-        console.error("Failed to unarchive session");
-      }
-    } catch (error) {
-      console.error("Failed to unarchive session:", error);
-    }
-  }, [sessionId]);
-
+  // Local UI state
   const [prompt, setPrompt] = useState("");
   const [selectedModel, setSelectedModel] = useState(
     "amazon-bedrock/anthropic.claude-opus-4-5-20251101-v1:0"
   );
   const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
-  const [answeredQuestions, setAnsweredQuestions] = useState<
-    Map<string, { questions: QuestionInfo[]; answers: string[][] }>
-  >(new Map());
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const modelDropdownRef = useRef<HTMLDivElement>(null);
   const prevEventsLengthRef = useRef(0);
 
-  const handleQuestionAnswer = useCallback(
-    async (requestId: string, answers: string[][], questions: QuestionInfo[]) => {
-      try {
-        const response = await fetch(`/api/sessions/${sessionId}/question/${requestId}/reply`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ answers }),
-        });
-        if (response.ok) {
-          setAnsweredQuestions((prev) => new Map(prev).set(requestId, { questions, answers }));
-        } else {
-          console.error("Failed to submit question answer");
+  // Derive answered questions from events (questions with status="completed")
+  const answeredQuestions = useMemo(() => {
+    const answered = new Map<string, { questions: QuestionInfo[]; answers: string[][] }>();
+    for (const event of events) {
+      if (
+        event.type === "tool_call" &&
+        event.tool === "question" &&
+        event.status === "completed" &&
+        event.output
+      ) {
+        const requestId = (event.args?.id as string) || event.callId || "";
+        const questions = (event.args?.questions as QuestionInfo[]) || [];
+        try {
+          const parsedOutput = JSON.parse(event.output);
+          const answers = Array.isArray(parsedOutput) ? parsedOutput : [[parsedOutput]];
+          answered.set(requestId, { questions, answers });
+        } catch {
+          answered.set(requestId, { questions, answers: [[event.output]] });
         }
-      } catch (error) {
-        console.error("Failed to submit question answer:", error);
       }
+    }
+    return answered;
+  }, [events]);
+
+  // Archive handlers (still REST for now - session mutations)
+  const handleArchive = useCallback(async () => {
+    if (!sessionState?.id) return;
+    try {
+      const response = await fetch(`/api/sessions/${sessionState.id}/archive`, { method: "POST" });
+      if (!response.ok) console.error("Failed to archive session");
+    } catch (error) {
+      console.error("Failed to archive session:", error);
+    }
+  }, [sessionState?.id]);
+
+  const handleUnarchive = useCallback(async () => {
+    if (!sessionState?.id) return;
+    try {
+      const response = await fetch(`/api/sessions/${sessionState.id}/unarchive`, {
+        method: "POST",
+      });
+      if (!response.ok) console.error("Failed to unarchive session");
+    } catch (error) {
+      console.error("Failed to unarchive session:", error);
+    }
+  }, [sessionState?.id]);
+
+  // Handle question answer via WebSocket
+  const handleQuestionAnswer = useCallback(
+    (requestId: string, answers: string[][]) => {
+      sendQuestionAnswer(requestId, answers);
     },
-    [sessionId]
+    [sendQuestionAnswer]
   );
 
+  // Auto-scroll on new events
   useEffect(() => {
     const isNewEvent = events.length > prevEventsLengthRef.current;
     const isNotInitialLoad = prevEventsLengthRef.current > 0;
@@ -233,13 +270,6 @@ export default function SessionPage() {
     }
     prevEventsLengthRef.current = events.length;
   }, [events]);
-
-  // Redirect if not authenticated
-  useEffect(() => {
-    if (!authPending && !_authSession) {
-      router.push("/");
-    }
-  }, [authPending, _authSession, router]);
 
   // Close model dropdown when clicking outside
   useEffect(() => {
@@ -253,12 +283,12 @@ export default function SessionPage() {
   }, []);
 
   // Check if sandbox is ready to accept messages
-  const sandboxReady = sessionState?.sandboxStatus === "ready" || sessionState?.sandboxStatus === "running";
+  const sandboxReady =
+    sessionState?.sandboxStatus === "ready" || sessionState?.sandboxStatus === "running";
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!prompt.trim() || isProcessing || !sandboxReady) return;
-
     sendPrompt(prompt, selectedModel);
     setPrompt("");
   };
@@ -272,186 +302,52 @@ export default function SessionPage() {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setPrompt(e.target.value);
-
-    // Send typing indicator (debounced)
-    if (typingTimeoutRef.current) {
-      clearTimeout(typingTimeoutRef.current);
-    }
-    typingTimeoutRef.current = setTimeout(() => {
-      sendTyping();
-    }, 300);
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    typingTimeoutRef.current = setTimeout(() => sendTyping(), 300);
   };
 
-  if (authPending) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground" />
-      </div>
-    );
-  }
-
-  return (
-    <SidebarLayout>
-      <SessionContent
-        sessionState={sessionState}
-        connected={connected}
-        connecting={connecting}
-        authError={authError}
-        connectionError={connectionError}
-        reconnect={reconnect}
-        participants={participants}
-        events={events}
-        artifacts={artifacts}
-        currentParticipantId={currentParticipantId}
-        scrollContainerRef={scrollContainerRef}
-        prompt={prompt}
-        isProcessing={isProcessing}
-        selectedModel={selectedModel}
-        modelDropdownOpen={modelDropdownOpen}
-        modelDropdownRef={modelDropdownRef}
-        inputRef={inputRef}
-        handleSubmit={handleSubmit}
-        handleInputChange={handleInputChange}
-        handleKeyDown={handleKeyDown}
-        setModelDropdownOpen={setModelDropdownOpen}
-        setSelectedModel={setSelectedModel}
-        stopExecution={stopExecution}
-        handleArchive={handleArchive}
-        handleUnarchive={handleUnarchive}
-        answeredQuestions={answeredQuestions}
-        onQuestionAnswer={handleQuestionAnswer}
-      />
-    </SidebarLayout>
-  );
-}
-
-function SessionContent({
-  sessionState,
-  connected,
-  connecting,
-  authError,
-  connectionError,
-  reconnect,
-  participants,
-  events,
-  artifacts,
-  currentParticipantId,
-  scrollContainerRef,
-  prompt,
-  isProcessing,
-  selectedModel,
-  modelDropdownOpen,
-  modelDropdownRef,
-  inputRef,
-  handleSubmit,
-  handleInputChange,
-  handleKeyDown,
-  setModelDropdownOpen,
-  setSelectedModel,
-  stopExecution,
-  handleArchive,
-  handleUnarchive,
-  answeredQuestions,
-  onQuestionAnswer,
-}: {
-  sessionState: ReturnType<typeof useSessionSocket>["sessionState"];
-  connected: boolean;
-  connecting: boolean;
-  authError: string | null;
-  connectionError: string | null;
-  reconnect: () => void;
-  participants: ReturnType<typeof useSessionSocket>["participants"];
-  events: ReturnType<typeof useSessionSocket>["events"];
-  artifacts: ReturnType<typeof useSessionSocket>["artifacts"];
-  currentParticipantId: string | null;
-  scrollContainerRef: React.RefObject<HTMLDivElement | null>;
-  prompt: string;
-  isProcessing: boolean;
-  selectedModel: string;
-  modelDropdownOpen: boolean;
-  modelDropdownRef: React.RefObject<HTMLDivElement | null>;
-  inputRef: React.RefObject<HTMLTextAreaElement | null>;
-  handleSubmit: (e: React.FormEvent) => void;
-  handleInputChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
-  handleKeyDown: (e: React.KeyboardEvent) => void;
-  setModelDropdownOpen: (open: boolean) => void;
-  setSelectedModel: (model: string) => void;
-  stopExecution: () => void;
-  handleArchive: () => void;
-  handleUnarchive: () => void;
-  answeredQuestions: Map<string, { questions: QuestionInfo[]; answers: string[][] }>;
-  onQuestionAnswer: (
-    requestId: string,
-    answers: string[][],
-    questions: QuestionInfo[]
-  ) => Promise<void>;
-}) {
-  const { isOpen, toggle } = useSidebarContext();
-
-  // Check if sandbox is ready to accept messages
-  const sandboxReady = sessionState?.sandboxStatus === "ready" || sessionState?.sandboxStatus === "running";
-
-  // Deduplicate and group events for rendering
-  const groupedEvents = useMemo(() => {
-    const filteredEvents: SandboxEvent[] = [];
-    const seenToolCalls = new Map<string, number>();
-    const seenCompletions = new Set<string>();
-
-    for (const event of events as SandboxEvent[]) {
-      if (event.type === "tool_call" && event.callId) {
-        // Deduplicate tool_call events by callId - keep the latest (most complete) one
-        const existingIdx = seenToolCalls.get(event.callId);
-        if (existingIdx !== undefined) {
-          filteredEvents[existingIdx] = event;
-        } else {
-          seenToolCalls.set(event.callId, filteredEvents.length);
-          filteredEvents.push(event);
-        }
-      } else if (event.type === "execution_complete" && event.messageId) {
-        // Skip duplicate execution_complete for the same message
-        if (!seenCompletions.has(event.messageId)) {
-          seenCompletions.add(event.messageId);
-          filteredEvents.push(event);
-        }
-      } else {
-        // All other events (token, user_message, git_sync, etc.) - add as-is
-        filteredEvents.push(event);
-      }
-    }
-
-    return groupEvents(filteredEvents);
-  }, [events]);
+  // Group events for rendering (deduplication now happens in the hook)
+  const groupedEvents = useMemo(() => groupEvents(events), [events]);
 
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
-      <header className="border-b border-border-muted flex-shrink-0">
-        <div className="px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            {!isOpen && (
-              <button
-                onClick={toggle}
-                className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted transition"
-                title="Open sidebar"
-              >
-                <SidebarToggleIcon />
-              </button>
-            )}
-            <div>
-              <h1 className="font-medium text-foreground">
-                {sessionState?.title || `${sessionState?.repoOwner}/${sessionState?.repoName}`}
-              </h1>
-              <p className="text-sm text-muted-foreground">
-                {sessionState?.repoOwner}/{sessionState?.repoName}
-              </p>
+      {!sessionState ? (
+        <HeaderSkeleton />
+      ) : (
+        <header className="border-b border-border-muted flex-shrink-0">
+          <div className="px-4 py-3 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              {!isOpen && (
+                <button
+                  onClick={toggle}
+                  className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted transition"
+                  title="Open sidebar"
+                >
+                  <PanelLeft className="h-4 w-4" />
+                </button>
+              )}
+              <div>
+                <h1 className="font-medium text-foreground">
+                  {sessionState.title || `${sessionState.repoOwner}/${sessionState.repoName}`}
+                </h1>
+                <p className="text-sm text-muted-foreground">
+                  {sessionState.repoOwner}/{sessionState.repoName}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <SessionStatus
+                connected={connected}
+                connecting={connecting}
+                sandboxStatus={sessionState.sandboxStatus}
+              />
+              <ParticipantsList participants={participants} />
+              <UserMenu />
             </div>
           </div>
-          <div className="flex items-center gap-4">
-            <SessionStatus connected={connected} connecting={connecting} sandboxStatus={sessionState?.sandboxStatus} />
-            <ParticipantsList participants={participants} />
-          </div>
-        </div>
-      </header>
+        </header>
+      )}
 
       {/* Connection error banner */}
       {(authError || connectionError) && (
@@ -471,6 +367,7 @@ function SessionContent({
         {/* Event timeline */}
         <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-4">
           <div className="max-w-3xl mx-auto space-y-2">
+            {connecting && events.length === 0 && <MessageListSkeleton />}
             {groupedEvents.map((group) => {
               if (group.type === "tool_group") {
                 return <ToolCallGroup key={group.id} events={group.events} groupId={group.id} />;
@@ -481,6 +378,7 @@ function SessionContent({
                 const questions = (event.args?.questions as QuestionInfo[]) || [];
                 const answered = answeredQuestions.get(requestId);
 
+                // Show answered state if we have it (from events with status=completed)
                 if (answered) {
                   return (
                     <AnsweredQuestion
@@ -491,33 +389,13 @@ function SessionContent({
                   );
                 }
 
-                // Check if question was already answered (status === "completed" from history)
-                if (event.status === "completed" && event.output) {
-                  // Parse output to extract answers - output contains the selected answers
-                  try {
-                    const parsedOutput = JSON.parse(event.output);
-                    const answers = Array.isArray(parsedOutput) ? parsedOutput : [[parsedOutput]];
-                    return (
-                      <AnsweredQuestion key={group.id} questions={questions} answers={answers} />
-                    );
-                  } catch {
-                    // If output isn't JSON, treat as single answer
-                    return (
-                      <AnsweredQuestion
-                        key={group.id}
-                        questions={questions}
-                        answers={[[event.output]]}
-                      />
-                    );
-                  }
-                }
-
+                // Show unanswered question card
                 return (
                   <QuestionCard
                     key={group.id}
                     requestId={requestId}
                     questions={questions}
-                    onAnswer={(reqId, answers) => onQuestionAnswer(reqId, answers, questions)}
+                    onAnswer={handleQuestionAnswer}
                   />
                 );
               }
@@ -547,13 +425,16 @@ function SessionContent({
         <form onSubmit={handleSubmit} className="max-w-4xl mx-auto p-4">
           {/* Action bar above input */}
           <div className="mb-3">
-            <ActionBar
+            <ActionBar.Root
               sessionId={sessionState?.id || ""}
-              sessionStatus={sessionState?.status || ""}
+              isArchived={sessionState?.status === "archived"}
               artifacts={artifacts}
-              onArchive={handleArchive}
-              onUnarchive={handleUnarchive}
-            />
+            >
+              <ActionBar.PreviewLink />
+              <ActionBar.PrLink />
+              <ActionBar.ArchiveToggle onArchive={handleArchive} onUnarchive={handleUnarchive} />
+              <ActionBar.Menu />
+            </ActionBar.Root>
           </div>
 
           {/* Input container */}
@@ -565,7 +446,13 @@ function SessionContent({
                 value={prompt}
                 onChange={handleInputChange}
                 onKeyDown={handleKeyDown}
-                placeholder={!sandboxReady ? "Waiting for sandbox..." : isProcessing ? "Type your next message..." : "Ask or build anything"}
+                placeholder={
+                  !sandboxReady
+                    ? "Waiting for sandbox..."
+                    : isProcessing
+                      ? "Type your next message..."
+                      : "Ask or build anything"
+                }
                 className="w-full resize-none bg-transparent px-4 pt-4 pb-12 focus:outline-none text-foreground placeholder:text-secondary-foreground"
                 rows={3}
               />
@@ -581,25 +468,22 @@ function SessionContent({
                     className="p-2 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition"
                     title="Stop"
                   >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <rect x="6" y="6" width="12" height="12" rx="1" strokeWidth={2} />
-                    </svg>
+                    <Square className="h-5 w-5" />
                   </button>
                 )}
                 <button
                   type="submit"
                   disabled={!prompt.trim() || isProcessing || !sandboxReady}
                   className="p-2 text-secondary-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition"
-                  title={!sandboxReady ? "Waiting for sandbox to be ready" : isProcessing && prompt.trim() ? "Wait for execution to complete" : "Send"}
+                  title={
+                    !sandboxReady
+                      ? "Waiting for sandbox to be ready"
+                      : isProcessing && prompt.trim()
+                        ? "Wait for execution to complete"
+                        : "Send"
+                  }
                 >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M5 10l7-7m0 0l7 7m-7-7v18"
-                    />
-                  </svg>
+                  <ArrowUp className="h-5 w-5" />
                 </button>
               </div>
             </div>
@@ -614,9 +498,7 @@ function SessionContent({
                   disabled={isProcessing}
                   className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed transition"
                 >
-                  <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
-                  </svg>
+                  <Layers className="h-3.5 w-3.5" />
                   <span>{formatModelNameLower(selectedModel)}</span>
                 </button>
 
@@ -659,23 +541,6 @@ function SessionContent({
   );
 }
 
-function SidebarToggleIcon() {
-  return (
-    <svg
-      className="w-4 h-4"
-      fill="none"
-      stroke="currentColor"
-      viewBox="0 0 24 24"
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <rect x="3" y="3" width="18" height="18" rx="2" />
-      <line x1="9" y1="3" x2="9" y2="21" />
-    </svg>
-  );
-}
-
 function SessionStatus({
   connected,
   connecting,
@@ -705,9 +570,21 @@ function SessionStatus({
   }
 
   // Connected - show sandbox status
-  const statusConfig: Record<string, { color: string; bgColor: string; label: string; pulse?: boolean }> = {
-    pending: { color: "text-muted-foreground", bgColor: "bg-muted-foreground", label: "Starting..." },
-    warming: { color: "text-yellow-600 dark:text-yellow-500", bgColor: "bg-yellow-500", label: "Warming up...", pulse: true },
+  const statusConfig: Record<
+    string,
+    { color: string; bgColor: string; label: string; pulse?: boolean }
+  > = {
+    pending: {
+      color: "text-muted-foreground",
+      bgColor: "bg-muted-foreground",
+      label: "Starting...",
+    },
+    warming: {
+      color: "text-yellow-600 dark:text-yellow-500",
+      bgColor: "bg-yellow-500",
+      label: "Warming up...",
+      pulse: true,
+    },
     syncing: { color: "text-accent", bgColor: "bg-accent", label: "Syncing...", pulse: true },
     ready: { color: "text-success", bgColor: "bg-success", label: "Ready" },
     running: { color: "text-accent", bgColor: "bg-accent", label: "Running", pulse: true },
@@ -719,7 +596,9 @@ function SessionStatus({
 
   return (
     <span className={`flex items-center gap-1.5 text-xs ${config.color}`}>
-      <span className={`w-2 h-2 rounded-full ${config.bgColor} ${config.pulse ? "animate-pulse" : ""}`} />
+      <span
+        className={`w-2 h-2 rounded-full ${config.bgColor} ${config.pulse ? "animate-pulse" : ""}`}
+      />
       {config.label}
     </span>
   );
@@ -737,7 +616,7 @@ function ThinkingIndicator() {
 function ParticipantsList({
   participants,
 }: {
-  participants: { userId: string; name: string; status: string }[];
+  participants: { userId: string; name: string; status: string; avatar?: string }[];
 }) {
   if (participants.length === 0) return null;
 
@@ -747,20 +626,65 @@ function ParticipantsList({
   return (
     <div className="flex -space-x-2">
       {uniqueParticipants.slice(0, 3).map((p) => (
-        <div
-          key={`header-${p.userId}`}
-          className="w-8 h-8 rounded-full bg-card flex items-center justify-center text-xs font-medium text-foreground border-2 border-white"
-          title={p.name}
-        >
-          {p.name.charAt(0).toUpperCase()}
-        </div>
+        <Avatar key={`header-${p.userId}`} className="w-8 h-8 border-2 border-background">
+          {p.avatar && <AvatarImage src={p.avatar} alt={p.name} />}
+          <AvatarFallback className="text-xs">{p.name.charAt(0).toUpperCase()}</AvatarFallback>
+        </Avatar>
       ))}
       {uniqueParticipants.length > 3 && (
-        <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-medium text-foreground border-2 border-white">
+        <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-medium text-foreground border-2 border-background">
           +{uniqueParticipants.length - 3}
         </div>
       )}
     </div>
+  );
+}
+
+function UserMenu() {
+  const { data: session } = authClient.useSession();
+  const router = useRouter();
+
+  const handleSignOut = async () => {
+    await authClient.signOut();
+    router.push("/");
+  };
+
+  if (!session?.user) return null;
+
+  const user = session.user;
+  const initials = user.name
+    ? user.name
+        .split(" ")
+        .map((n) => n[0])
+        .join("")
+        .toUpperCase()
+        .slice(0, 2)
+    : user.email?.[0].toUpperCase() || "?";
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button className="focus:outline-none" title={user.name || user.email || "User menu"}>
+          <Avatar className="w-8 h-8 cursor-pointer hover:opacity-80 transition">
+            {user.image && <AvatarImage src={user.image} alt={user.name || "Profile"} />}
+            <AvatarFallback className="text-xs">{initials}</AvatarFallback>
+          </Avatar>
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuLabel className="font-normal">
+          <div className="flex flex-col space-y-1">
+            {user.name && <p className="text-sm font-medium">{user.name}</p>}
+            {user.email && <p className="text-xs text-muted-foreground truncate">{user.email}</p>}
+          </div>
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={handleSignOut} className="cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-900/20">
+          <LogOut className="mr-2 h-4 w-4" />
+          Sign out
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -807,7 +731,7 @@ function EventItem({
               {!isCurrentUser && event.author?.avatar && (
                 <img src={event.author.avatar} alt={authorName} className="w-5 h-5 rounded-full" />
               )}
-              <span className="text-xs text-accent">{authorName}</span>
+              <span className="text-xs font-medium text-foreground">{authorName}</span>
             </div>
             <span className="text-xs text-secondary-foreground">{time}</span>
           </div>

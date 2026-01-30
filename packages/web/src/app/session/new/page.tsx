@@ -1,9 +1,14 @@
 "use client";
 
 import { DEFAULT_MODEL } from "@dispatch/shared";
+import { PanelLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { SidebarLayout, useSidebarContext } from "@/components/sidebar-layout";
+import { Alert } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { IconButton } from "@/components/ui/icon-button";
+import { Spinner } from "@/components/ui/spinner";
 import { authClient } from "@/lib/auth-client";
 
 interface Repo {
@@ -30,12 +35,6 @@ export default function NewSessionPage() {
     }
   }, [isPending, session, router]);
 
-  useEffect(() => {
-    if (session) {
-      fetchRepos();
-    }
-  }, [session]);
-
   const fetchRepos = async () => {
     setLoading(true);
     try {
@@ -50,6 +49,12 @@ export default function NewSessionPage() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (session) {
+      fetchRepos();
+    }
+  }, [session]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -91,7 +96,7 @@ export default function NewSessionPage() {
   if (isPending || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground" />
+        <Spinner size="lg" />
       </div>
     );
   }
@@ -103,6 +108,7 @@ export default function NewSessionPage() {
         selectedRepo={selectedRepo}
         setSelectedRepo={setSelectedRepo}
         error={error}
+        setError={setError}
         creating={creating}
         handleSubmit={handleSubmit}
       />
@@ -115,6 +121,7 @@ function NewSessionContent({
   selectedRepo,
   setSelectedRepo,
   error,
+  setError,
   creating,
   handleSubmit,
 }: {
@@ -122,6 +129,7 @@ function NewSessionContent({
   selectedRepo: string;
   setSelectedRepo: (value: string) => void;
   error: string;
+  setError: (value: string) => void;
   creating: boolean;
   handleSubmit: (e: React.FormEvent) => void;
 }) {
@@ -133,13 +141,9 @@ function NewSessionContent({
       {!isOpen && (
         <header className="border-b border-border-muted flex-shrink-0">
           <div className="px-4 py-3 flex items-center gap-3">
-            <button
-              onClick={toggle}
-              className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted transition"
-              title="Open sidebar"
-            >
-              <SidebarToggleIcon />
-            </button>
+            <IconButton onClick={toggle} title="Open sidebar">
+              <PanelLeft />
+            </IconButton>
             <h1 className="text-lg font-semibold text-foreground">New Session</h1>
           </div>
         </header>
@@ -150,17 +154,23 @@ function NewSessionContent({
           {isOpen && <h1 className="text-2xl font-bold text-foreground mb-8">New Session</h1>}
           <form onSubmit={handleSubmit} className="space-y-6">
             {error && (
-              <div className="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 px-4 py-3 border border-red-200 dark:border-red-800">
+              <Alert variant="error" onDismiss={() => setError("")}>
                 {error}
-              </div>
+              </Alert>
             )}
 
             <div>
-              <label className="block text-sm font-medium text-foreground mb-2">Repository</label>
+              <label
+                htmlFor="repo-select"
+                className="block text-sm font-medium text-foreground mb-2"
+              >
+                Repository
+              </label>
               <select
+                id="repo-select"
                 value={selectedRepo}
                 onChange={(e) => setSelectedRepo(e.target.value)}
-                className="w-full px-4 py-3 border border-border bg-input text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                className="w-full px-4 py-3 border border-border bg-input text-foreground focus:outline-none focus:ring-2 focus:ring-ring rounded-md"
                 required
               >
                 <option value="">Select a repository...</option>
@@ -177,33 +187,12 @@ function NewSessionContent({
               )}
             </div>
 
-            <button
-              type="submit"
-              disabled={creating || !selectedRepo}
-              className="w-full py-3 bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition"
-            >
+            <Button type="submit" disabled={creating || !selectedRepo} className="w-full">
               {creating ? "Creating..." : "Create Session"}
-            </button>
+            </Button>
           </form>
         </div>
       </div>
     </div>
-  );
-}
-
-function SidebarToggleIcon() {
-  return (
-    <svg
-      className="w-4 h-4"
-      fill="none"
-      stroke="currentColor"
-      viewBox="0 0 24 24"
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <rect x="3" y="3" width="18" height="18" rx="2" />
-      <line x1="9" y1="3" x2="9" y2="21" />
-    </svg>
   );
 }

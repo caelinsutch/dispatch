@@ -1,5 +1,7 @@
 "use client";
 
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+
 interface Participant {
   userId: string;
   name: string;
@@ -26,20 +28,17 @@ export function ParticipantsSection({ participants }: ParticipantsSectionProps) 
       <div className="flex -space-x-2">
         {uniqueParticipants.slice(0, 4).map((participant) => (
           <div key={`sidebar-${participant.userId}`} className="relative" title={participant.name}>
-            {participant.avatar ? (
-              <img
-                src={participant.avatar}
-                alt={participant.name}
-                className="w-6 h-6 rounded-full border-2 border-white object-cover"
-              />
-            ) : (
-              <div className="w-6 h-6 rounded-full border-2 border-white bg-card flex items-center justify-center text-xs font-medium text-foreground">
+            <Avatar className="w-6 h-6 border-2 border-background">
+              {participant.avatar && (
+                <AvatarImage src={participant.avatar} alt={participant.name} />
+              )}
+              <AvatarFallback className="text-[10px]">
                 {participant.name.charAt(0).toUpperCase()}
-              </div>
-            )}
+              </AvatarFallback>
+            </Avatar>
             {/* Status indicator */}
             {participant.status === "active" && (
-              <span className="absolute bottom-0 right-0 w-2 h-2 bg-success rounded-full border border-white" />
+              <span className="absolute bottom-0 right-0 w-2 h-2 bg-success rounded-full border border-background" />
             )}
           </div>
         ))}
