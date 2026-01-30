@@ -1,8 +1,10 @@
 "use client";
 
+import { ChevronRight, FileText, Pencil, Terminal, Zap } from "lucide-react";
 import { useState } from "react";
 import type { SandboxEvent } from "@/lib/tool-formatters";
 import { formatToolGroup } from "@/lib/tool-formatters";
+import { cn } from "@/lib/utils";
 import { ToolCallItem } from "./tool-call-item";
 
 interface ToolCallGroupProps {
@@ -10,69 +12,18 @@ interface ToolCallGroupProps {
   groupId: string;
 }
 
-function ChevronIcon({ rotated }: { rotated: boolean }) {
-  return (
-    <svg
-      className={`w-3.5 h-3.5 text-secondary-foreground transition-transform duration-200 ${
-        rotated ? "rotate-90" : ""
-      }`}
-      fill="none"
-      stroke="currentColor"
-      viewBox="0 0 24 24"
-    >
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-    </svg>
-  );
-}
-
 function ToolIcon({ toolName }: { toolName: string }) {
-  const iconClass = "w-3.5 h-3.5 text-secondary-foreground";
+  const iconClass = "h-3.5 w-3.5 text-secondary-foreground";
 
   switch (toolName) {
     case "Read":
-      return (
-        <svg className={iconClass} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-          />
-        </svg>
-      );
+      return <FileText className={iconClass} />;
     case "Edit":
-      return (
-        <svg className={iconClass} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
-          />
-        </svg>
-      );
+      return <Pencil className={iconClass} />;
     case "Bash":
-      return (
-        <svg className={iconClass} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-          />
-        </svg>
-      );
+      return <Terminal className={iconClass} />;
     default:
-      return (
-        <svg className={iconClass} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M13 10V3L4 14h7v7l9-11h-7z"
-          />
-        </svg>
-      );
+      return <Zap className={iconClass} />;
   }
 }
 
@@ -115,10 +66,16 @@ export function ToolCallGroup({ events, groupId }: ToolCallGroupProps) {
   return (
     <div className="py-1">
       <button
+        type="button"
         onClick={() => setIsExpanded(!isExpanded)}
         className="w-full flex items-center gap-2 text-sm text-left hover:bg-muted px-2 py-1 -mx-2 transition-colors"
       >
-        <ChevronIcon rotated={isExpanded} />
+        <ChevronRight
+          className={cn(
+            "h-3.5 w-3.5 text-secondary-foreground transition-transform duration-200",
+            isExpanded && "rotate-90"
+          )}
+        />
         <ToolIcon toolName={formatted.toolName} />
         <span className="font-medium text-foreground">{formatted.toolName}</span>
         <span className="text-muted-foreground">{formatted.summary}</span>

@@ -1,10 +1,10 @@
+import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { drizzle } from "drizzle-orm/d1";
 import { headers } from "next/headers";
-import { getCloudflareContext } from "@opennextjs/cloudflare";
-import { checkAccessAllowed, parseAllowlist } from "./access-control";
 import * as schema from "@/db/schema";
+import { checkAccessAllowed, parseAllowlist } from "./access-control";
 
 // Type declarations for custom session data
 export interface SessionUser {

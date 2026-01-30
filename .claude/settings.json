@@ -1,49 +1,49 @@
 {
-	"hooks": {
-		"UserPromptSubmit": [
-			{
-				"hooks": [
-					{
-						"type": "command",
-						"command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/skill-eval.sh",
-						"timeout": 5
-					}
-				]
-			}
-		],
-		"PreToolUse": [
-			{
-				"matcher": "Edit|MultiEdit|Write",
-				"hooks": [
-					{
-						"type": "command",
-						"command": "# Prevent editing on main branch\n[ \"$(git branch --show-current)\" != \"main\" ] || { echo '{\"block\": true, \"message\": \"Cannot edit files on main branch. Create a feature branch first: git checkout -b your-name/feature-name\"}' >&2; exit 2; }",
-						"timeout": 5
-					}
-				]
-			}
-		],
-		"PostToolUse": [
-			{
-				"matcher": "Edit|MultiEdit|Write",
-				"hooks": [
-					{
-						"type": "command",
-						"command": "# Type-check TypeScript files (non-blocking)\nif [[ \"$CLAUDE_TOOL_INPUT_FILE_PATH\" =~ \\.(ts|tsx)$ ]]; then\n  output=$(cd \"$CLAUDE_PROJECT_DIR\" && bunx tsc --noEmit 2>&1 | head -20)\n  exit_code=$?\n  if [ $exit_code -ne 0 ] && [ -n \"$output\" ]; then\n    errors=$(echo \"$output\" | grep -E \"error TS|Error:\" | head -5)\n    if [ -n \"$errors\" ]; then\n      echo '<post-tool-use-hook>'\n      echo 'TypeScript errors detected:'\n      echo \"$errors\"\n      echo '</post-tool-use-hook>'\n    fi\n  fi\nfi\nexit 0",
-						"timeout": 30
-					}
-				]
-			},
-			{
-				"matcher": "Edit|MultiEdit|Write",
-				"hooks": [
-					{
-						"type": "command",
-						"command": "# Lint changed files with Biome (non-blocking)\nif [[ \"$CLAUDE_TOOL_INPUT_FILE_PATH\" =~ \\.(ts|tsx|js|jsx|json)$ ]]; then\n  output=$(cd \"$CLAUDE_PROJECT_DIR\" && bunx biome check \"$CLAUDE_TOOL_INPUT_FILE_PATH\" 2>&1 | head -20)\n  exit_code=$?\n  if [ $exit_code -ne 0 ] && [ -n \"$output\" ]; then\n    echo '<post-tool-use-hook>'\n    echo 'Lint issues detected:'\n    echo \"$output\"\n    echo '</post-tool-use-hook>'\n  fi\nfi\nexit 0",
-						"timeout": 15
-					}
-				]
-			}
-		]
-	}
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/skill-eval.sh",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|MultiEdit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "# Prevent editing on main branch\n[ \"$(git branch --show-current)\" != \"main\" ] || { echo '{\"block\": true, \"message\": \"Cannot edit files on main branch. Create a feature branch first: git checkout -b your-name/feature-name\"}' >&2; exit 2; }",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|MultiEdit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "# Type-check TypeScript files (non-blocking)\nif [[ \"$CLAUDE_TOOL_INPUT_FILE_PATH\" =~ \\.(ts|tsx)$ ]]; then\n  output=$(cd \"$CLAUDE_PROJECT_DIR\" && bunx tsc --noEmit 2>&1 | head -20)\n  exit_code=$?\n  if [ $exit_code -ne 0 ] && [ -n \"$output\" ]; then\n    errors=$(echo \"$output\" | grep -E \"error TS|Error:\" | head -5)\n    if [ -n \"$errors\" ]; then\n      echo '<post-tool-use-hook>'\n      echo 'TypeScript errors detected:'\n      echo \"$errors\"\n      echo '</post-tool-use-hook>'\n    fi\n  fi\nfi\nexit 0",
+            "timeout": 30
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|MultiEdit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "# Lint changed files with Biome (non-blocking)\nif [[ \"$CLAUDE_TOOL_INPUT_FILE_PATH\" =~ \\.(ts|tsx|js|jsx|json)$ ]]; then\n  output=$(cd \"$CLAUDE_PROJECT_DIR\" && bunx biome check \"$CLAUDE_TOOL_INPUT_FILE_PATH\" 2>&1 | head -20)\n  exit_code=$?\n  if [ $exit_code -ne 0 ] && [ -n \"$output\" ]; then\n    echo '<post-tool-use-hook>'\n    echo 'Lint issues detected:'\n    echo \"$output\"\n    echo '</post-tool-use-hook>'\n  fi\nfi\nexit 0",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  }
 }

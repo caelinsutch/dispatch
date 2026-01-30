@@ -1,7 +1,11 @@
 "use client";
 
-// Better Auth doesn't require a session provider wrapper
-// The useSession hook handles session state internally via the auth client
+import { ThemeProvider } from "@/components/theme-provider";
+
 export function Providers({ children }: { children: React.ReactNode }) {
-  return <>{children}</>;
+  return (
+    <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+      {children}
+    </ThemeProvider>
+  );
 }

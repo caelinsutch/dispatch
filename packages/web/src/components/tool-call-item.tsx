@@ -1,7 +1,20 @@
 "use client";
 
+import {
+  Box,
+  ChevronRight,
+  FileText,
+  Folder,
+  Globe,
+  HelpCircle,
+  Pencil,
+  Plus,
+  Search,
+  Terminal,
+} from "lucide-react";
 import type { SandboxEvent } from "@/lib/tool-formatters";
 import { formatToolCall } from "@/lib/tool-formatters";
+import { cn } from "@/lib/utils";
 
 interface ToolCallItemProps {
   event: SandboxEvent;
@@ -10,121 +23,30 @@ interface ToolCallItemProps {
   showTime?: boolean;
 }
 
-function ChevronIcon({ rotated }: { rotated: boolean }) {
-  return (
-    <svg
-      className={`w-3.5 h-3.5 text-secondary-foreground transition-transform duration-200 ${
-        rotated ? "rotate-90" : ""
-      }`}
-      fill="none"
-      stroke="currentColor"
-      viewBox="0 0 24 24"
-    >
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-    </svg>
-  );
-}
-
 function ToolIcon({ name }: { name: string | null }) {
   if (!name) return null;
 
-  const iconClass = "w-3.5 h-3.5 text-secondary-foreground";
+  const iconClass = "h-3.5 w-3.5 text-secondary-foreground";
 
   switch (name) {
     case "file":
-      return (
-        <svg className={iconClass} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-          />
-        </svg>
-      );
+      return <FileText className={iconClass} />;
     case "pencil":
-      return (
-        <svg className={iconClass} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
-          />
-        </svg>
-      );
+      return <Pencil className={iconClass} />;
     case "plus":
-      return (
-        <svg className={iconClass} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-        </svg>
-      );
+      return <Plus className={iconClass} />;
     case "terminal":
-      return (
-        <svg className={iconClass} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-          />
-        </svg>
-      );
+      return <Terminal className={iconClass} />;
     case "search":
-      return (
-        <svg className={iconClass} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-          />
-        </svg>
-      );
+      return <Search className={iconClass} />;
     case "folder":
-      return (
-        <svg className={iconClass} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
-          />
-        </svg>
-      );
+      return <Folder className={iconClass} />;
     case "box":
-      return (
-        <svg className={iconClass} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
-          />
-        </svg>
-      );
+      return <Box className={iconClass} />;
     case "globe":
-      return (
-        <svg className={iconClass} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"
-          />
-        </svg>
-      );
+      return <Globe className={iconClass} />;
     case "question":
-      return (
-        <svg className={iconClass} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-          />
-        </svg>
-      );
+      return <HelpCircle className={iconClass} />;
     default:
       return null;
   }
@@ -142,10 +64,16 @@ export function ToolCallItem({ event, isExpanded, onToggle, showTime = true }: T
   return (
     <div className="py-0.5">
       <button
+        type="button"
         onClick={onToggle}
         className="w-full flex items-center gap-1.5 text-sm text-left text-muted-foreground hover:text-foreground transition-colors"
       >
-        <ChevronIcon rotated={isExpanded} />
+        <ChevronRight
+          className={cn(
+            "h-3.5 w-3.5 text-secondary-foreground transition-transform duration-200",
+            isExpanded && "rotate-90"
+          )}
+        />
         <ToolIcon name={formatted.icon} />
         <span className="truncate">
           {formatted.toolName} {formatted.summary}

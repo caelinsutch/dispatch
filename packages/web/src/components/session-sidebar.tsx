@@ -1,8 +1,13 @@
 "use client";
 
+import { FileText, PanelLeft, Plus } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { IconButton } from "@/components/ui/icon-button";
+import { Input } from "@/components/ui/input";
+import { ModeToggle } from "@/components/ui/mode-toggle";
+import { SessionListSkeleton } from "@/components/ui/skeleton";
 import { authClient } from "@/lib/auth-client";
 import { formatRelativeTime, isInactiveSession } from "@/lib/time";
 
@@ -25,17 +30,19 @@ export function SessionSidebar({ onNewSession, onToggle }: SessionSidebarProps) 
   const { data: authSession } = authClient.useSession();
   const pathname = usePathname();
   const [sessions, setSessions] = useState<SessionItem[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const hasFetchedRef = useRef(false);
 
   useEffect(() => {
-    if (authSession) {
+    // Only fetch once when authSession becomes available
+    if (authSession && !hasFetchedRef.current) {
+      hasFetchedRef.current = true;
       fetchSessions();
     }
   }, [authSession]);
 
   const fetchSessions = async () => {
-    setLoading(true);
     try {
       const res = await fetch("/api/sessions");
       if (res.ok) {
@@ -45,7 +52,7 @@ export function SessionSidebar({ onNewSession, onToggle }: SessionSidebarProps) 
     } catch (error) {
       console.error("Failed to fetch sessions:", error);
     } finally {
-      setLoading(false);
+      setInitialLoading(false);
     }
   };
 
@@ -88,67 +95,36 @@ export function SessionSidebar({ onNewSession, onToggle }: SessionSidebarProps) 
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border-muted">
         <div className="flex items-center gap-2">
-          <button
-            onClick={onToggle}
-            className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted transition"
-            title="Toggle sidebar"
-          >
-            <SidebarIcon />
-          </button>
+          <IconButton onClick={onToggle} title="Toggle sidebar" size="sm">
+            <PanelLeft />
+          </IconButton>
           <Link href="/" className="flex items-center gap-2">
-            <InspectIcon />
+            <FileText className="h-5 w-5" />
             <span className="font-semibold text-foreground">Inspect</span>
           </Link>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={onNewSession}
-            className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted transition"
-            title="New session"
-          >
-            <PlusIcon />
-          </button>
-          {authSession?.user?.image ? (
-            <button
-              onClick={() => authClient.signOut()}
-              className="w-7 h-7 rounded-full overflow-hidden"
-              title={`Signed in as ${authSession.user.name}\nClick to sign out`}
-            >
-              <img
-                src={authSession.user.image}
-                alt={authSession.user.name || "User"}
-                className="w-full h-full object-cover"
-              />
-            </button>
-          ) : (
-            <button
-              onClick={() => authClient.signOut()}
-              className="w-7 h-7 rounded-full bg-card flex items-center justify-center text-xs font-medium text-foreground"
-              title="Sign out"
-            >
-              {authSession?.user?.name?.charAt(0).toUpperCase() || "?"}
-            </button>
-          )}
+        <div className="flex items-center gap-1">
+          <ModeToggle />
+          <IconButton onClick={onNewSession} title="New session" size="sm">
+            <Plus />
+          </IconButton>
         </div>
       </div>
 
       {/* Search */}
       <div className="px-3 py-2">
-        <input
+        <Input
           type="text"
           placeholder="Search sessions..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full px-3 py-2 text-sm bg-input border border-border focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent placeholder:text-secondary-foreground text-foreground"
         />
       </div>
 
       {/* Session List */}
       <div className="flex-1 overflow-y-auto">
-        {loading ? (
-          <div className="flex justify-center py-8">
-            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-muted-foreground" />
-          </div>
+        {initialLoading ? (
+          <SessionListSkeleton count={6} />
         ) : sessions.length === 0 ? (
           <div className="px-4 py-8 text-center text-sm text-muted-foreground">No sessions yet</div>
         ) : (
@@ -206,50 +182,5 @@ function SessionListItem({ session, isActive }: { session: SessionItem; isActive
         <span className="truncate">{repoInfo}</span>
       </div>
     </Link>
-  );
-}
-
-function InspectIcon() {
-  return (
-    <svg
-      className="w-5 h-5"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-      <polyline points="14 2 14 8 20 8" />
-      <line x1="16" y1="13" x2="8" y2="13" />
-      <line x1="16" y1="17" x2="8" y2="17" />
-      <polyline points="10 9 9 9 8 9" />
-    </svg>
-  );
-}
-
-function PlusIcon() {
-  return (
-    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-    </svg>
-  );
-}
-
-function SidebarIcon() {
-  return (
-    <svg
-      className="w-4 h-4"
-      fill="none"
-      stroke="currentColor"
-      viewBox="0 0 24 24"
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <rect x="3" y="3" width="18" height="18" rx="2" />
-      <line x1="9" y1="3" x2="9" y2="21" />
-    </svg>
   );
 }

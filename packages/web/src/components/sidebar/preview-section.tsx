@@ -1,5 +1,7 @@
 "use client";
 
+import { Globe } from "lucide-react";
+
 interface PreviewSectionProps {
   tunnelUrls: Record<number, string>;
   activePorts?: number[];
@@ -20,7 +22,7 @@ export function PreviewSection({ tunnelUrls, activePorts }: PreviewSectionProps)
     <div className="space-y-2">
       {entries.map(([port, url]) => (
         <div key={port} className="flex items-center gap-2 text-sm">
-          <GlobeIcon className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+          <Globe className="w-4 h-4 text-muted-foreground flex-shrink-0" />
           <span className="text-muted-foreground">Port {port}</span>
           <a
             href={url}
@@ -33,18 +35,5 @@ export function PreviewSection({ tunnelUrls, activePorts }: PreviewSectionProps)
         </div>
       ))}
     </div>
-  );
-}
-
-function GlobeIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <circle cx="12" cy="12" r="10" strokeWidth={2} />
-      <path
-        strokeLinecap="round"
-        strokeWidth={2}
-        d="M2 12h20M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"
-      />
-    </svg>
   );
 }

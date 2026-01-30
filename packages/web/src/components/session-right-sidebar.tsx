@@ -11,6 +11,7 @@ import {
   PreviewSection,
   TasksSection,
 } from "./sidebar";
+import { RightSidebarSkeleton } from "./ui/skeleton";
 
 interface SessionState {
   id: string;
@@ -61,17 +62,7 @@ export function SessionRightSidebar({
   const tasks = useMemo(() => extractLatestTasks(events), [events]);
 
   if (!sessionState) {
-    return (
-      <aside className="w-80 border-l border-border-muted overflow-y-auto hidden lg:block">
-        <div className="p-4">
-          <div className="animate-pulse space-y-4">
-            <div className="h-4 bg-muted w-3/4" />
-            <div className="h-4 bg-muted w-1/2" />
-            <div className="h-4 bg-muted w-2/3" />
-          </div>
-        </div>
-      </aside>
-    );
+    return <RightSidebarSkeleton />;
   }
 
   return (
