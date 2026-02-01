@@ -23,8 +23,8 @@ SANDBOX_DIR = Path(__file__).parent.parent / "sandbox"
 OPENCODE_VERSION = "latest"
 
 # Cache buster - change this to force Modal image rebuild
-# v42: Add VS Code CLI for Remote Tunnels
-CACHE_BUSTER = "v42-add-vscode-tunnel"
+# v47: Fix daedalus wrapper to use absolute path
+CACHE_BUSTER = "v47-daedalus-absolute-path"
 
 # Base image with all development tools
 base_image = (
@@ -109,6 +109,20 @@ base_image = (
         "tar -xzf /tmp/vscode_cli.tar.gz -C /usr/local/bin",
         "rm /tmp/vscode_cli.tar.gz",
         "code tunnel --version || echo 'VS Code CLI installed'",
+    )
+    # Install Daedalus CLI for web extraction (private repo requires PAT)
+    # PATH must include /root/.bun/bin during build: postinstall runs `bun run`, daedalus shebang uses bun
+    # Note: Daedalus must run from its extractor directory due to workspace dependencies
+    .run_commands(
+        "git clone --depth 1 https://x-access-token:${GITHUB_PAT}@github.com/tylertaewook/daedalus.git /opt/daedalus",
+        "cd /opt/daedalus/extractor && PATH=/root/.bun/bin:$PATH /root/.bun/bin/bun install",
+        # Create a global wrapper script that runs daedalus from its directory with absolute path
+        'echo \'#!/bin/bash\' > /usr/local/bin/daedalus',
+        'echo \'cd /opt/daedalus/extractor && exec /root/.bun/bin/bun run /opt/daedalus/extractor/src/index.ts "$@"\' >> /usr/local/bin/daedalus',
+        "chmod +x /usr/local/bin/daedalus",
+        # Test the wrapper
+        "PATH=/root/.bun/bin:$PATH daedalus healthcheck || echo 'Daedalus wrapper created'",
+        secrets=[modal.Secret.from_name("daedalus-repo")],
     )
     # Create working directories
     .run_commands(
